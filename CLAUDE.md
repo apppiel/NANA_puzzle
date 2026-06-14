@@ -15,13 +15,15 @@
 ## 폴더 구조
 - Assets/Scripts/Data  — 데이터 정의 (LevelData)
 - Assets/Scripts/Core  — 게임 로직 (BoardRenderer)
+- Assets/Scripts/Core/GameManager - 게임 흐름 정리
 - Assets/Scripts/UI    — UI (예정)
 - Assets/Levels        — 레벨 데이터 에셋 (Level_1 등)
 - Assets/Art           — 스프라이트/프리팹 (Cell 프리팹)
 
 ## 핵심 파일
 - LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
-- BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채우고, 클리어를 판정.
+- BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움.
+- GameManager.cs : 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 클리어 화면 켜고 끄기. 게임 전체 흐름을 결정
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 
 ## 게임 규칙 / 데이터 모델
@@ -40,10 +42,13 @@
 - [x] 에디터에서 플레이 가능 (MVP 완성)
 
 ## 다음 할 일 (TODO)
-- [ ] 채워지는 경로를 실제 선(LineRenderer)으로 그리기
-- [ ] 클리어 화면 / 간단한 UI
-- [ ] 레벨 선택 + 레벨 여러 개
-- [ ] blockedCells로 비정형 모양 레벨 만들기
+- [x] 채워지는 경로를 실제 선(LineRenderer)으로 그리기
+- [x] 클리어 화면 / 간단한 UI
+- [x] 레벨 선택 + 레벨 여러 개
+- [x] blockedCells로 비정형 모양 레벨 만들기
+- [x] BoardRenderer.cs , GameManager.cs 분리
+- [x] 현재 라운드 저장
+- [x] LoadingScreen 추가
 - [ ] 안드로이드 빌드 & 실기기 테스트
 - [ ] (나중에) 절차적 레벨 생성 검토
 
@@ -52,3 +57,4 @@
 - 에디터 GUI 작업(폴더/스크립트 생성, 컴포넌트 부착, 인스펙터 연결)은 사용자가 직접 함.
 - 단순 편집은 사용자, 여러 파일에 걸친 코드 작업은 Claude Code가 담당.
 - 커밋은 의미 있는 체크포인트마다.
+- 코드마다 필요하다고 생각되는 부분에 이해하기 쉽게 추가적인 주석 달아줄 것.
