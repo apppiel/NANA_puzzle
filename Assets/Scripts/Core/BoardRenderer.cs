@@ -6,6 +6,7 @@ public class BoardRenderer : MonoBehaviour
     public LevelData level;
     public GameObject cellPrefab;
     public float cellSize = 1.1f;
+    public GameObject clearPanel;   // 클리어 시 보여줄 UI 패널. 인스펙터에서 연결 안 하면 null로 무시됨
 
     Color emptyColor  = new Color(0.85f, 0.85f, 0.85f); // 빈 칸
     Color startColor  = new Color(1f, 0.8f, 0.2f);      // 시작 칸
@@ -128,7 +129,21 @@ public class BoardRenderer : MonoBehaviour
             won = true;
             Redraw();
             Debug.Log("클리어!");
+            // null 체크: 인스펙터에서 clearPanel을 연결하지 않아도 오류 없이 동작하도록
+            if (clearPanel != null) clearPanel.SetActive(true);
         }
+    }
+
+    // 다시하기 버튼(UI Button)의 OnClick에서 호출할 함수.
+    // won·isDrawing 플래그를 초기화하고 경로를 시작 칸으로 되돌린 뒤 클리어 패널을 숨김
+    public void RestartLevel()
+    {
+        won = false;
+        isDrawing = false;
+        path.Clear();
+        path.Add(level.startCell);
+        if (clearPanel != null) clearPanel.SetActive(false);
+        Redraw();
     }
 
     void Redraw()
