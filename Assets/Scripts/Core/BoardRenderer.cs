@@ -46,6 +46,7 @@ public class BoardRenderer : MonoBehaviour
     fillableCount = cells.Count;
     path.Add(level.startCell);
     Redraw();
+    FitCamera();   // 레벨 크기에 맞게 카메라 자동 조정
   }
 
   void ClearBoard()
@@ -187,6 +188,25 @@ public class BoardRenderer : MonoBehaviour
     }
     tex.Apply();
     return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+  }
+
+  void FitCamera()
+  {
+    Camera cam = Camera.main;
+    if (cam == null) return;
+
+    // 카메라를 항상 격자 정중앙 위로 고정. z=-10은 2D에서 카메라가 씬을 볼 수 있는 표준 위치
+    cam.transform.position = new Vector3(0f, 0f, -10f);
+
+    float boardW = level.width  * cellSize;
+    float boardH = level.height * cellSize;
+    float margin = 1f;  // 격자 가장자리와 화면 끝 사이의 여백. 줄이면 더 꽉 차게, 늘리면 더 여유롭게 보임
+
+    // orthographicSize = 화면 세로 절반 크기(유닛).
+    // 세로 기준과 가로 기준 중 더 큰 값을 써야 격자가 화면을 벗어나지 않음.
+    float sizeForHeight = boardH / 2f + margin;
+    float sizeForWidth  = (boardW / 2f + margin) / cam.aspect;  // 가로 → 세로 단위로 환산
+    cam.orthographicSize = Mathf.Max(sizeForHeight, sizeForWidth);
   }
 
   Vector3 CellToWorld(Vector2Int c)

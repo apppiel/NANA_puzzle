@@ -12,6 +12,9 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        Application.targetFrameRate = 60;  // 목표 프레임을 60으로 고정. 30으로 낮추면 배터리 소모 줄어듦
+        QualitySettings.vSyncCount = 0;    // vSync를 끄지 않으면 targetFrameRate가 무시되고 화면 주사율에 묶임
+
         // PlayerPrefs는 앱이 꺼져도 유지되는 단순 저장소 (에디터에서도 유지됨)
         int saved = PlayerPrefs.GetInt(ProgressKey, 0);   // 저장된 레벨 (없으면 0)
         LoadLevel(saved);
@@ -43,6 +46,14 @@ public class GameManager : MonoBehaviour
     // UI Button의 OnClick에서 호출
     public void RestartLevel() { LoadLevel(currentIndex); }
     public void NextLevel()    { LoadLevel(currentIndex + 1); }
+
+    // 테스트용: 저장 데이터를 지우고 1번 레벨로 돌아감. UI 버튼에 연결하거나 인스펙터 우클릭으로 실행
+    public void ResetToFirstLevel()
+    {
+        PlayerPrefs.DeleteKey(ProgressKey);
+        PlayerPrefs.Save();
+        LoadLevel(0);
+    }
 
     // 인스펙터에서 이 컴포넌트를 우클릭 → "Reset Progress" 선택 시 실행
     // 저장된 레벨 진행 상황을 삭제해 다음 플레이부터 레벨 1로 시작
