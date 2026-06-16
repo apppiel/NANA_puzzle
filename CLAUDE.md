@@ -43,7 +43,6 @@
 
 ## 다음 할 일 (TODO)
 - [x] 채워지는 경로를 실제 선(LineRenderer)으로 그리기
-- [x] 클리어 화면 / 간단한 UI
 - [x] 레벨 선택 + 레벨 여러 개
 - [x] blockedCells로 비정형 모양 레벨 만들기
 - [x] BoardRenderer.cs , GameManager.cs 분리

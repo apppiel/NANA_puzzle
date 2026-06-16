@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -12,10 +13,10 @@ public class BoardRenderer : MonoBehaviour
 
   // ── 칸 색상 ─────────────────────────────────────────────────────
   // new Color(R, G, B)  ← 각 값은 0~1 범위 (255 기준이 아님)
-  Color emptyColor  = new Color(0.85f, 0.85f, 0.85f);  // 아직 지나지 않은 빈 칸 → 연한 회색
-  Color startColor  = new Color(1f,    0.8f,  0.2f);   // 시작 칸 → 노란색
-  Color filledColor = new Color(0.3f,  0.6f,  1f);     // 경로로 채운 칸 → 파란색
-  Color winColor    = new Color(0.3f,  0.85f, 0.4f);   // 클리어 시 모든 칸 → 초록색
+  Color emptyColor = new Color(0.85f, 0.85f, 0.85f);  // 아직 지나지 않은 빈 칸 → 연한 회색
+  Color startColor = new Color(1f, 0.8f, 0.2f);   // 시작 칸 → 노란색
+  Color filledColor = new Color(0.3f, 0.6f, 1f);     // 경로로 채운 칸 → 파란색
+  Color winColor = new Color(0.3f, 0.85f, 0.4f);   // 클리어 시 모든 칸 → 초록색
 
   // ── 런타임 데이터 ───────────────────────────────────────────────
   // 격자 좌표(Vector2Int) → 해당 칸의 SpriteRenderer
@@ -36,6 +37,20 @@ public class BoardRenderer : MonoBehaviour
   bool isDrawing = false;  // 현재 손가락을 누르고 있는 중인지 여부
   bool won = false;        // 클리어 여부. true가 되면 Update에서 입력을 완전히 무시
 
+  // ── 등장 애니메이션 설정 ────────────────────────────────────────
+  // 인스펙터에서 값을 바꾸면 플레이 중에도 즉시 반영됨
+  public float appearDuration = 0.22f;
+  // ↑ 칸 하나가 0→1 크기로 커지는 데 걸리는 시간(초).
+  //   줄이면(0.1) 빠릿하게, 늘리면(0.5) 여유롭게 등장.
+
+  public float staggerStep = 0.03f;
+  // ↑ (c.x + c.y) * staggerStep = 각 칸의 등장 시작 딜레이(초).
+  //   0으로 하면 모든 칸이 동시에 팡! 나타남.
+  //   0.05~0.1 이상이면 물결이 느려져서 각 칸이 뚜렷하게 구분되어 나타남.
+
+  bool appearing = false;
+  // ↑ 애니메이션이 돌아가는 동안 true. Update에서 입력을 막는 플래그로 사용.
+
 
   // ── 초기화 ──────────────────────────────────────────────────────
 
@@ -50,6 +65,7 @@ public class BoardRenderer : MonoBehaviour
   // GameManager가 "이 레벨 그려줘" 하고 호출하는 함수 (외부에서 부를 수 있도록 public)
   public void ShowLevel(LevelData newLevel)
   {
+    StopAllCoroutines();   // 이전 등장 애니메이션이 돌고 있으면 중단
     level = newLevel;
 
     ClearBoard();   // 이전 레벨의 칸·선 오브젝트를 전부 제거
@@ -59,7 +75,7 @@ public class BoardRenderer : MonoBehaviour
 
     // 격자의 중심이 (0, 0)이 되도록 오프셋 계산
     // 예) 3×3 격자 → offsetX = (3-1)/2 = 1 → x좌표가 -1, 0, 1로 배치됨
-    offsetX = (level.width  - 1) / 2f;
+    offsetX = (level.width - 1) / 2f;
     offsetY = (level.height - 1) / 2f;
 
     DrawBoard();    // 칸 오브젝트 생성
@@ -73,6 +89,8 @@ public class BoardRenderer : MonoBehaviour
 
     Redraw();       // 색상·선 초기 반영
     FitCamera();    // 레벨 크기에 맞게 카메라 범위 자동 조정
+
+    StartCoroutine(AnimateAppear());   // 칸들이 톡톡 나타나기
   }
 
 
@@ -124,7 +142,7 @@ public class BoardRenderer : MonoBehaviour
 
     line.startColor = line.endColor = new Color(0.15f, 0.4f, 0.9f);  // 선 색상: 진한 파란색
     line.startWidth = line.endWidth = 0.18f;   // 선 두께(유닛). 키우면 선이 굵어짐
-    line.numCapVertices    = 6;  // 선 끝부분을 몇 각형으로 둥글게 만들지 (클수록 더 동그래짐)
+    line.numCapVertices = 6;  // 선 끝부분을 몇 각형으로 둥글게 만들지 (클수록 더 동그래짐)
     line.numCornerVertices = 6;  // 꺾이는 모서리를 몇 각형으로 둥글게 만들지
     line.sortingOrder = 1;       // 칸 스프라이트(기본 order=0) 위에 선이 그려지도록 1로 설정
     line.useWorldSpace = true;
@@ -136,8 +154,8 @@ public class BoardRenderer : MonoBehaviour
 
   void Update()
   {
-    // 클리어됐거나 아직 레벨이 로드되지 않은 경우 입력 무시
-    if (won || level == null) return;
+    // 클리어됐거나, 등장 애니메이션 중이거나, 아직 레벨이 로드되지 않은 경우 입력 무시
+    if (won || appearing || level == null) return;
 
     // 손가락(마우스 버튼) 처음 눌렀을 때
     if (Input.GetMouseButtonDown(0))
@@ -210,7 +228,8 @@ public class BoardRenderer : MonoBehaviour
     if (path.Count == fillableCount)
     {
       won = true;
-      Redraw();  // 클리어 색(초록)으로 전체 갱신
+      Redraw();                              // 클리어 색(초록)으로 전체 갱신
+      StartCoroutine(AnimateWin());          // 클리어 직후 번쩍 연출 시작
       if (gameManager != null) gameManager.OnLevelSolved();  // GameManager에 클리어 알림
     }
   }
@@ -250,10 +269,10 @@ public class BoardRenderer : MonoBehaviour
   Sprite MakeRoundedSprite(int size, int radius)
   {
     Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-    tex.wrapMode   = TextureWrapMode.Clamp;    // 텍스처 가장자리가 늘어나지 않도록
+    tex.wrapMode = TextureWrapMode.Clamp;    // 텍스처 가장자리가 늘어나지 않도록
     tex.filterMode = FilterMode.Bilinear;       // 확대/축소 시 부드럽게 보이도록
 
-    Color on  = Color.white;                   // 사각형 내부 → 흰색 (나중에 sr.color로 색을 덮어씌움)
+    Color on = Color.white;                   // 사각형 내부 → 흰색 (나중에 sr.color로 색을 덮어씌움)
     Color off = new Color(1f, 1f, 1f, 0f);    // 사각형 바깥 → 완전 투명
 
     for (int py = 0; py < size; py++)
@@ -292,14 +311,14 @@ public class BoardRenderer : MonoBehaviour
     // 카메라를 격자 정중앙 위에 고정. z = -10은 2D에서 씬 전체를 볼 수 있는 표준 위치
     cam.transform.position = new Vector3(0f, 0f, -10f);
 
-    float boardW = level.width  * cellSize;  // 격자 전체 가로 길이(유닛)
+    float boardW = level.width * cellSize;  // 격자 전체 가로 길이(유닛)
     float boardH = level.height * cellSize;  // 격자 전체 세로 길이(유닛)
     float margin = 1f;  // 격자와 화면 끝 사이의 여백. 줄이면 더 꽉 차게, 늘리면 더 여유롭게 보임
 
     // orthographicSize = 화면 세로의 절반 길이(유닛)
     // 세로 기준 크기와 가로 기준 크기 중 큰 값을 써야 어떤 화면 비율에서도 격자가 잘리지 않음
     float sizeForHeight = boardH / 2f + margin;
-    float sizeForWidth  = (boardW / 2f + margin) / cam.aspect;  // 가로 길이를 세로 기준으로 환산
+    float sizeForWidth = (boardW / 2f + margin) / cam.aspect;  // 가로 길이를 세로 기준으로 환산
     cam.orthographicSize = Mathf.Max(sizeForHeight, sizeForWidth);
   }
 
@@ -320,5 +339,112 @@ public class BoardRenderer : MonoBehaviour
     int x = Mathf.RoundToInt(world.x / cellSize + offsetX);
     int y = Mathf.RoundToInt(world.y / cellSize + offsetY);
     return new Vector2Int(x, y);
+  }
+
+
+  // ── 등장 애니메이션 ─────────────────────────────────────────────
+
+  IEnumerator AnimateAppear()
+  {
+    appearing = true;
+
+    // 모든 칸을 크기 0으로 숨긴 뒤 한 프레임씩 키워 나감
+    foreach (var kv in cells)
+      kv.Value.transform.localScale = Vector3.zero;
+
+    float t = 0f;
+    bool done = false;
+    while (!done)
+    {
+      t += Time.deltaTime;
+      done = true;
+      foreach (var kv in cells)
+      {
+        Vector2Int c = kv.Key;
+        // c.x + c.y 가 클수록(오른쪽 위 칸일수록) 늦게 시작 → 왼쪽 아래→오른쪽 위 물결
+        float delay = (c.x + c.y) * staggerStep;
+        // p: 이 칸의 진행도 0→1. delay 이전엔 0, appearDuration 후엔 1
+        float p = Mathf.Clamp01((t - delay) / appearDuration);
+        kv.Value.transform.localScale = Vector3.one * EaseOutBack(p);
+        if (p < 1f) done = false;  // 아직 다 안 끝난 칸이 있으면 루프 유지
+      }
+      yield return null;  // 다음 프레임까지 대기
+    }
+
+    appearing = false;
+  }
+
+  // EaseOutBack: 1을 살짝 넘었다가 1로 돌아오는 곡선 (통통 튀는 느낌)
+  // x=0 → 0, x=1 → 1 이지만 중간에 1.1~1.2 정도까지 올라갔다 내려옴
+  // c1(1.70158)이 클수록 overshoot(튀어오르는 양)이 커짐. 3 이상이면 많이 튐
+  float EaseOutBack(float x)
+  {
+    float c1 = 1.30158f;
+    float c3 = c1 + 1f;
+    return 1f + c3 * Mathf.Pow(x - 1f, 3f) + c1 * Mathf.Pow(x - 1f, 2f);
+  }
+
+
+  // ── 클리어 번쩍 애니메이션 ──────────────────────────────────────
+
+  IEnumerator AnimateWin()
+  {
+    // winColor에서 흰색 방향으로 80% 섞은 색
+    // Lerp 비율을 높이면(0.9) 더 새하얗게, 낮추면(0.5) 은은하게 빛남
+    Color bright = Color.Lerp(winColor, Color.white, 0.8f);
+
+    int pulseCount = 2;
+    // ↑ 번쩍이는 횟수. 3으로 올리면 더 화려하지만 다음 레벨 전환 전까지 시간이 빡빡해짐.
+
+    float pulseDuration = 0.28f;
+    // ↑ 번쩍 1회 왕복 시간(초). 짧으면(0.15) 강렬하고, 길면(0.5) 천천히 빛남.
+    //   pulseCount * pulseDuration이 GoToNextAfterDelay의 대기(1.0s)보다 짧아야 연출이 잘림.
+
+    float scalePeak = 1.06f;
+    // ↑ 번쩍 정점에서 칸이 커지는 배율. 1.0이면 크기 변화 없음, 1.1이면 10% 더 커짐.
+
+    for (int pulse = 0; pulse < pulseCount; pulse++)
+    {
+      float t = 0f;
+      bool done = false;
+      while (!done)
+      {
+        t += Time.deltaTime;
+        done = true;
+        foreach (var kv in cells)
+        {
+          Vector2Int c = kv.Key;
+          // 등장 애니메이션과 같은 대각선 물결 방향(왼쪽 아래 → 오른쪽 위)
+          float delay = (c.x + c.y) * staggerStep;
+          float p = (t - delay) / pulseDuration;
+
+          float sinVal = (p >= 0f && p < 1f) ? Mathf.Sin(p * Mathf.PI) : 0f;
+          // sinVal: 0→1→0 종 모양. 정점(p=0.5)에서 가장 밝고 가장 크게
+
+          if (p < 0f)
+          {
+            // 딜레이 대기 중 → winColor·크기 1 유지
+            kv.Value.color = winColor;
+            kv.Value.transform.localScale = Vector3.one;
+            done = false;
+          }
+          else if (p < 1f)
+          {
+            // 번쩍 진행 중: 색과 크기를 sin 곡선으로 함께 키웠다 줄임
+            kv.Value.color = Color.Lerp(winColor, bright, sinVal);
+            kv.Value.transform.localScale = Vector3.one * Mathf.Lerp(1f, scalePeak, sinVal);
+            done = false;
+          }
+          else
+          {
+            // 이 칸의 이번 펄스 완료 → 원래 상태로 복귀
+            kv.Value.color = winColor;
+            kv.Value.transform.localScale = Vector3.one;
+          }
+        }
+        yield return null;
+      }
+      // 두 번째 펄스가 바로 이어지면 칸마다 딜레이 없이 동시에 시작해 더 강하게 보임
+    }
   }
 }
