@@ -14,16 +14,16 @@
 
 ## 폴더 구조
 - Assets/Scripts/Data  — 데이터 정의 (LevelData)
-- Assets/Scripts/Core  — 게임 로직 (BoardRenderer)
-- Assets/Scripts/Core/GameManager - 게임 흐름 정리
+- Assets/Scripts/Core  — 게임 로직 (BoardRenderer, GameManager)
 - Assets/Scripts/UI    — UI (예정)
 - Assets/Levels        — 레벨 데이터 에셋 (Level_1 등)
 - Assets/Art           — 스프라이트/프리팹 (Cell 프리팹)
+- Assets/Casual Game Sounds U6 — 효과음 에셋 (DM-CGS-01~50.wav)
 
 ## 핵심 파일
 - LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
-- BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움.
-- GameManager.cs : 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 클리어 화면 켜고 끄기. 게임 전체 흐름을 결정
+- BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생.
+- GameManager.cs: 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 레벨 번호 텍스트(LevelText) 표시. 게임 전체 흐름을 결정.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 
 ## 게임 규칙 / 데이터 모델
@@ -38,18 +38,20 @@
 - [x] LevelData (격자 기반 데이터 모델)
 - [x] Level_1 에셋 (3x3)
 - [x] BoardRenderer: 격자 렌더링 + 입력 + 칸 채우기 + 되돌리기 + 클리어 판정
-      (현재 클리어 시 전체 초록색 + Console에 "클리어!" 출력)
 - [x] 에디터에서 플레이 가능 (MVP 완성)
-
-## 다음 할 일 (TODO)
 - [x] 채워지는 경로를 실제 선(LineRenderer)으로 그리기
 - [x] 레벨 선택 + 레벨 여러 개
 - [x] blockedCells로 비정형 모양 레벨 만들기
-- [x] BoardRenderer.cs , GameManager.cs 분리
+- [x] BoardRenderer.cs, GameManager.cs 분리
 - [x] 현재 라운드 저장
 - [x] LoadingScreen 추가
 - [x] 모바일: 카메라 자동 맞춤, 60fps
 - [x] 안드로이드 빌드 & 실기기 테스트
+- [x] 색상 테마: 경로 칸 분홍, 경로 선 진한 분홍, 클리어 라벤더
+- [x] 효과음: 칸 채울 때 fillSound, 클리어 시 winSound (인스펙터에서 연결)
+- [x] 레벨 번호 텍스트(LevelText) UI 표시
+
+## 다음 할 일 (TODO)
 - [ ] (나중에) 절차적 레벨 생성 검토
 
 ## 협업 방식 메모
