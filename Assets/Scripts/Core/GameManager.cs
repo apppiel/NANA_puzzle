@@ -1,10 +1,12 @@
 using System.Collections;
 using UnityEngine;
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
   public BoardRenderer board;     // 판을 그리는 친구. 인스펙터에서 Board 오브젝트 연결
   public LevelData[] levels;      // 레벨 목록 (순서대로). 인스펙터에서 드래그로 추가
+  public TMP_Text levelText;   // 레벨 번호 표시용
 
   // PlayerPrefs에 저장할 키. 문자열 오타를 방지하기 위해 const로 선언
   const string ProgressKey = "currentLevel";
@@ -28,6 +30,7 @@ public class GameManager : MonoBehaviour
     if (index >= levels.Length) index = levels.Length - 1;
 
     currentIndex = index;
+    if (levelText != null) levelText.text = "Level " + (currentIndex + 1);
     // 레벨 이동마다 저장해 앱 재시작 시 이어서 플레이
     PlayerPrefs.SetInt(ProgressKey, currentIndex);
     PlayerPrefs.Save();

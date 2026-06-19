@@ -10,6 +10,8 @@ public class BoardRenderer : MonoBehaviour
   public GameManager gameManager;  // 클리어 시 OnLevelSolved()를 불러줄 대상. 인스펙터에서 GameManager 오브젝트 연결
   public GameObject cellPrefab;    // 칸 하나를 찍어낼 프리팹. 인스펙터에서 Cell 프리팹 연결
   public float cellSize = 1.1f;    // 칸 사이 간격(유닛). 1.0이면 딱 붙고, 1.1이면 약간 간격이 생김
+  public AudioClip fillSound;      // 칸을 채울 때 재생할 효과음. 인스펙터에서 AudioClip 연결
+  public AudioClip winSound;       // 클리어 시 재생할 효과음. 인스펙터에서 AudioClip 연결
 
   // ── 칸 색상 ─────────────────────────────────────────────────────
   // new Color(R, G, B)  ← 각 값은 0~1 범위 (255 기준이 아님)
@@ -30,6 +32,7 @@ public class BoardRenderer : MonoBehaviour
 
   LevelData level;       // 현재 표시 중인 레벨 데이터 (GameManager가 ShowLevel로 넘겨줌)
   LineRenderer line;      // 경로 위에 그려지는 선. CreateLine()에서 생성
+  AudioSource audioSource; // 효과음 재생기. Awake에서 자동 추가
   Sprite cellSprite;      // 모든 칸이 공유하는 둥근 사각형 그림. Awake에서 한 번만 생성
   Material lineMaterial;  // 경로 선용 머티리얼. new Material()은 자동 해제가 안 되므로 Awake에서 한 번만 생성
   float offsetX, offsetY;  // 격자를 화면 중앙에 맞추기 위한 이동값 (ShowLevel에서 계산)
@@ -60,6 +63,8 @@ public class BoardRenderer : MonoBehaviour
     // 스프라이트를 여기서 만들어야, 곧바로 호출될 수 있는 ShowLevel() 안에서 안전하게 사용 가능
     cellSprite = MakeRoundedSprite(256, 64);
     lineMaterial = new Material(Shader.Find("Sprites/Default"));  // 레벨이 바뀌어도 재사용
+    audioSource = gameObject.AddComponent<AudioSource>();
+    audioSource.playOnAwake = false;
   }
 
   // GameManager가 "이 레벨 그려줘" 하고 호출하는 함수 (외부에서 부를 수 있도록 public)
@@ -214,6 +219,7 @@ public class BoardRenderer : MonoBehaviour
     if (cells.ContainsKey(target) && adjacent && !path.Contains(target))
     {
       path.Add(target);
+      if (fillSound != null) audioSource.PlayOneShot(fillSound);
       Redraw();
       CheckWin();
     }
@@ -228,7 +234,8 @@ public class BoardRenderer : MonoBehaviour
     if (path.Count == fillableCount)
     {
       won = true;
-      Redraw();                              // 클리어 색(초록)으로 전체 갱신
+      if (winSound != null) audioSource.PlayOneShot(winSound);
+      Redraw();                              // 클리어 색(라벤더)으로 전체 갱신
       StartCoroutine(AnimateWin());          // 클리어 직후 번쩍 연출 시작
       if (gameManager != null) gameManager.OnLevelSolved();  // GameManager에 클리어 알림
     }
