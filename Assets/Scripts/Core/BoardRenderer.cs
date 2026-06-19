@@ -15,8 +15,8 @@ public class BoardRenderer : MonoBehaviour
   // new Color(R, G, B)  ← 각 값은 0~1 범위 (255 기준이 아님)
   Color emptyColor = new Color(0.85f, 0.85f, 0.85f);  // 아직 지나지 않은 빈 칸 → 연한 회색
   Color startColor = new Color(1f, 0.8f, 0.2f);   // 시작 칸 → 노란색
-  Color filledColor = new Color(0.3f, 0.6f, 1f);     // 경로로 채운 칸 → 파란색
-  Color winColor = new Color(0.3f, 0.85f, 0.4f);   // 클리어 시 모든 칸 → 초록색
+  Color filledColor = new Color(1f, 0.65f, 0.82f);     // 경로로 채운 칸 → 분홍색
+  Color winColor = new Color(0.72f, 0.52f, 0.95f);  // 클리어 시 모든 칸 → 라벤더
 
   // ── 런타임 데이터 ───────────────────────────────────────────────
   // 격자 좌표(Vector2Int) → 해당 칸의 SpriteRenderer
@@ -140,7 +140,7 @@ public class BoardRenderer : MonoBehaviour
     // 이 줄 없이 기본 셰이더를 쓰면 선이 분홍색(셰이더 누락) 또는 흰색으로만 표시됨
     line.material = lineMaterial;  // Awake에서 한 번만 만든 머티리얼을 재사용 (매번 new Material 하면 메모리 누수)
 
-    line.startColor = line.endColor = new Color(0.15f, 0.4f, 0.9f);  // 선 색상: 진한 파란색
+    line.startColor = line.endColor = new Color(0.85f, 0.2f, 0.5f);  // 선 색상: 진한 분홍색
     line.startWidth = line.endWidth = 0.18f;   // 선 두께(유닛). 키우면 선이 굵어짐
     line.numCapVertices = 6;  // 선 끝부분을 몇 각형으로 둥글게 만들지 (클수록 더 동그래짐)
     line.numCornerVertices = 6;  // 꺾이는 모서리를 몇 각형으로 둥글게 만들지
