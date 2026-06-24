@@ -22,7 +22,7 @@
 
 ## 핵심 파일
 - LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
-- BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생.
+- BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
 - GameManager.cs: 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 레벨 번호 텍스트(LevelText) 표시. 게임 전체 흐름을 결정.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 
@@ -49,6 +49,10 @@
 - [x] 색상 테마: 경로 칸 분홍, 경로 선 진한 분홍, 클리어 라벤더
 - [x] 효과음: 칸 채울 때 fillSound, 클리어 시 winSound (인스펙터에서 연결)
 - [x] 레벨 번호 텍스트(LevelText) UI 표시
+- [x] 선 색상 #ff8a8a로 변경, lineColor 필드로 통합
+- [x] 시작 칸 중앙 흰 원: 첫 이동 시 선 색으로 채워지며 유지
+- [x] 클리어 시 마지막 칸에 같은 색 원 팝 등장
+- [x] 리팩터링: path[^1], static readonly dirs, WaitForSeconds 캐싱
 
 ## 다음 할 일 (TODO)
 - [ ] 셋팅창 제작 ( 사운드 , 진동 )
