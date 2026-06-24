@@ -63,24 +63,4 @@ public class GameManager : MonoBehaviour
     int next = currentIndex + 1;
     LoadLevel(next >= levels.Length ? 0 : next);
   }
-
-
-
-  // 테스트용: 저장 데이터를 지우고 1번 레벨로 돌아감. UI 버튼에 연결하거나 인스펙터 우클릭으로 실행
-  public void ResetToFirstLevel()
-  {
-    PlayerPrefs.DeleteKey(ProgressKey);
-    PlayerPrefs.Save();
-    LoadLevel(0);
-  }
-
-  // 인스펙터에서 이 컴포넌트를 우클릭 → "Reset Progress" 선택 시 실행
-  // 저장된 레벨 진행 상황을 삭제해 다음 플레이부터 레벨 1로 시작
-  [ContextMenu("Reset Progress")]
-  void ResetProgress()
-  {
-    PlayerPrefs.DeleteKey(ProgressKey);
-    PlayerPrefs.Save();
-    Debug.Log("진행 상황 초기화됨 (다음 Play부터 레벨 1)");
-  }
 }

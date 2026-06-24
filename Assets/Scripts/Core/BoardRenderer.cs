@@ -252,7 +252,7 @@ public class BoardRenderer : MonoBehaviour
       path.Add(target);
       movedInGesture = true;
       if (fillSound != null) audioSource.PlayOneShot(fillSound);
-      SettingsManager.Instance?.Vibrate();  // 진동 설정이 켜져 있으면 진동
+      if (SettingsManager.Instance != null) SettingsManager.Instance.Vibrate();  // 진동 설정이 켜져 있으면 진동
       StartCoroutine(AnimateCellPop(cells[target]));  // 칸이 추가될 때 팝 애니메이션
       Redraw();
       CheckWin();
@@ -350,7 +350,7 @@ public class BoardRenderer : MonoBehaviour
     {
       won = true;
       if (winSound != null) audioSource.PlayOneShot(winSound);
-      SettingsManager.Instance?.Vibrate();  // 클리어 시 진동
+      if (SettingsManager.Instance != null) SettingsManager.Instance.Vibrate();  // 클리어 시 진동
       Redraw();                              // 클리어 색(라벤더)으로 전체 갱신
       StartCoroutine(AnimateWin());          // 클리어 직후 번쩍 연출 시작
       if (gameManager != null) gameManager.OnLevelSolved();  // GameManager에 클리어 알림

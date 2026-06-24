@@ -13,13 +13,13 @@ public class SettingsPanel : MonoBehaviour
   {
     panel.SetActive(false);  // 게임 시작 시 설정창 닫혀 있게
 
-    // 저장된 설정값으로 토글 초기 상태 맞추기
-    soundToggle.isOn = SettingsManager.Instance.SoundOn;
-    vibrationToggle.isOn = SettingsManager.Instance.VibrationOn;
+    // 체크 = 음소거, 해제 = 소리 켜짐 → SoundOn과 반대로 초기화
+    soundToggle.isOn = !SettingsManager.Instance.SoundOn;
+    vibrationToggle.isOn = !SettingsManager.Instance.VibrationOn;
 
-    // 토글 변경 시 SettingsManager에 자동으로 전달
-    soundToggle.onValueChanged.AddListener(SettingsManager.Instance.SetSound);
-    vibrationToggle.onValueChanged.AddListener(SettingsManager.Instance.SetVibration);
+    // 토글 값을 반전해서 전달 (체크됨 = 꺼짐)
+    soundToggle.onValueChanged.AddListener(muted => SettingsManager.Instance.SetSound(!muted));
+    vibrationToggle.onValueChanged.AddListener(muted => SettingsManager.Instance.SetVibration(!muted));
   }
 
   // ⚙️ 버튼의 OnClick에 연결
