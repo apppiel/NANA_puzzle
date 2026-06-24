@@ -14,16 +14,16 @@ public class BoardRenderer : MonoBehaviour
   public AudioClip winSound;       // 클리어 시 재생할 효과음. 인스펙터에서 AudioClip 연결
 
   // ── 칸 색상 ─────────────────────────────────────────────────────
-  // new Color(R, G, B)  ← 각 값은 0~1 범위 (255 기준이 아님)
-  Color emptyColor = new Color(0.85f, 0.85f, 0.85f);  // 아직 지나지 않은 빈 칸 → 연한 회색
-  Color startColor = new Color(1f, 0.8f, 0.2f);   // 시작 칸 → 노란색
-  Color filledColor = new Color(1f, 0.65f, 0.82f);     // 경로로 채운 칸 → 분홍색
-  Color winColor = new Color(0.72f, 0.52f, 0.95f);  // 클리어 시 모든 칸 → 라벤더
-
+  // public으로 선언해 인스펙터에서 직접 색을 바꿀 수 있음. 코드 수정 없이 테마 변경 가능
+  public Color emptyColor = Color.white;                              // 빈 칸 → 흰색
+  public Color startColor = new Color(1f, 0.8f, 0.2f);              // 시작 칸 → 노란색
+  public Color filledColor = new Color(0.996f, 0.871f, 0.871f);     // 경로 칸 → 연한 핑크
+  public Color winColor = new Color(0.72f, 0.52f, 0.95f);           // 클리어 시 → 라벤더
   // ── 런타임 데이터 ───────────────────────────────────────────────
   // 격자 좌표(Vector2Int) → 해당 칸의 SpriteRenderer
   // Dictionary를 쓰는 이유: "이 좌표에 칸이 있는지" 확인하고 색을 바꿀 때 O(1)로 빠르게 접근 가능
   Dictionary<Vector2Int, SpriteRenderer> cells = new Dictionary<Vector2Int, SpriteRenderer>();
+  Dictionary<Vector2Int, SpriteRenderer> glows = new Dictionary<Vector2Int, SpriteRenderer>(); // 칸 바깥 글로우 스프라이트
 
   // 플레이어가 지나온 칸을 순서대로 저장한 목록
   // 순서가 필요한 이유 1: 되돌리기 → 마지막 칸(path[끝])을 제거
@@ -37,8 +37,11 @@ public class BoardRenderer : MonoBehaviour
   Material lineMaterial;  // 경로 선용 머티리얼. new Material()은 자동 해제가 안 되므로 Awake에서 한 번만 생성
   float offsetX, offsetY;  // 격자를 화면 중앙에 맞추기 위한 이동값 (ShowLevel에서 계산)
   int fillableCount;     // 채워야 할 칸의 총 수. path.Count가 이 값과 같아지면 클리어
-  bool isDrawing = false;  // 현재 손가락을 누르고 있는 중인지 여부
-  bool won = false;        // 클리어 여부. true가 되면 Update에서 입력을 완전히 무시
+  bool isDrawing = false;      // 현재 손가락을 누르고 있는 중인지 여부
+  bool armed = false;          // 마지막 칸 탭 후 이어그리기 대기 중
+  bool movedInGesture = false; // 현재 제스처에서 칸을 하나라도 이동했는지 (armed 해제 타이밍 판단용)
+  bool won = false;            // 클리어 여부. true가 되면 Update에서 입력을 완전히 무시
+  bool isResetting = false;    // 막힘 감지 후 자동 리셋 대기 중. 이 동안 입력 무시
 
   // ── 등장 애니메이션 설정 ────────────────────────────────────────
   // 인스펙터에서 값을 바꾸면 플레이 중에도 즉시 반영됨
@@ -77,6 +80,8 @@ public class BoardRenderer : MonoBehaviour
 
     won = false;
     isDrawing = false;
+    armed = false;
+    isResetting = false;
 
     // 격자의 중심이 (0, 0)이 되도록 오프셋 계산
     // 예) 3×3 격자 → offsetX = (3-1)/2 = 1 → x좌표가 -1, 0, 1로 배치됨
@@ -109,6 +114,7 @@ public class BoardRenderer : MonoBehaviour
       Destroy(child.gameObject);
 
     cells.Clear();
+    glows.Clear();
     path.Clear();
   }
 
@@ -130,6 +136,19 @@ public class BoardRenderer : MonoBehaviour
         SpriteRenderer sr = obj.GetComponent<SpriteRenderer>();
         sr.sprite = cellSprite;   // 프리팹 기본 스프라이트 대신 코드로 만든 둥근 사각형으로 교체
         cells[coord] = sr;
+
+        // 칸 뒤에 글로우 스프라이트 추가 (처음엔 투명, 채워질 때 맥동)
+        GameObject glowObj = new GameObject("Glow");
+        glowObj.transform.SetParent(obj.transform);
+        glowObj.transform.localPosition = Vector3.zero;
+        glowObj.transform.localScale = Vector3.one * 1.15f;  // 칸보다 45% 더 크게 → 바깥으로 삐져나옴
+
+        SpriteRenderer glowSr = glowObj.AddComponent<SpriteRenderer>();
+        glowSr.sprite = cellSprite;
+        glowSr.color = new Color(1f, 1f, 1f, 0.5f);  // 진한 핑크, 처음엔 완전 투명
+        glowSr.sortingOrder = -1;  // 칸(order 0) 뒤에 그려짐
+
+        glows[coord] = glowSr;
       }
     }
   }
@@ -145,7 +164,7 @@ public class BoardRenderer : MonoBehaviour
     // 이 줄 없이 기본 셰이더를 쓰면 선이 분홍색(셰이더 누락) 또는 흰색으로만 표시됨
     line.material = lineMaterial;  // Awake에서 한 번만 만든 머티리얼을 재사용 (매번 new Material 하면 메모리 누수)
 
-    line.startColor = line.endColor = new Color(0.85f, 0.2f, 0.5f);  // 선 색상: 진한 분홍색
+    line.startColor = line.endColor = new Color(1f, 0.761f, 0.761f);  // 선 색상: #ffc2c2 연한 핑크
     line.startWidth = line.endWidth = 0.18f;   // 선 두께(유닛). 키우면 선이 굵어짐
     line.numCapVertices = 6;  // 선 끝부분을 몇 각형으로 둥글게 만들지 (클수록 더 동그래짐)
     line.numCornerVertices = 6;  // 꺾이는 모서리를 몇 각형으로 둥글게 만들지
@@ -159,21 +178,38 @@ public class BoardRenderer : MonoBehaviour
 
   void Update()
   {
-    // 클리어됐거나, 등장 애니메이션 중이거나, 아직 레벨이 로드되지 않은 경우 입력 무시
-    if (won || appearing || level == null) return;
+    // 클리어됐거나, 등장 애니메이션 중이거나, 자동 리셋 대기 중이거나, 레벨 미로드 시 입력 무시
+    if (won || appearing || isResetting || level == null) return;
+
+    AnimateGlow();
 
     // 손가락(마우스 버튼) 처음 눌렀을 때
     if (Input.GetMouseButtonDown(0))
     {
       Vector2Int c = WorldToCell(Camera.main.ScreenToWorldPoint(Input.mousePosition));
 
-      // 시작 칸을 누른 경우에만 그리기 시작 (아무 칸이나 눌러서 시작하면 안 되므로)
+      movedInGesture = false;  // 새 제스처 시작 시 초기화
+
       if (c == level.startCell)
       {
+        // 시작 칸 → 경로 초기화 후 처음부터 다시 그리기
+        armed = false;
         isDrawing = true;
         path.Clear();
         path.Add(level.startCell);
         Redraw();
+      }
+      else if (armed)
+      {
+        // armed 상태에서 두 번째 탭 → 즉시 그리기 시작
+        armed = false;
+        isDrawing = true;
+      }
+      else if (path.Count > 0 && c == path[path.Count - 1])
+      {
+        // 마지막 칸 탭 → 바로 드래그도 되고, 탭만 하고 떼면 armed 상태로 전환
+        isDrawing = true;
+        armed = true;  // 탭만 하고 뗐을 때를 대비해 armed 세팅 (이동 성공 시 MouseButtonUp에서 해제)
       }
     }
 
@@ -186,7 +222,11 @@ public class BoardRenderer : MonoBehaviour
 
     // 손가락을 뗐을 때
     if (Input.GetMouseButtonUp(0))
+    {
+      // 이동이 실제로 일어났으면 armed 해제. 탭만 했으면 armed 유지 → 다음 탭+드래그 가능
+      if (movedInGesture) armed = false;
       isDrawing = false;
+    }
   }
 
 
@@ -199,15 +239,6 @@ public class BoardRenderer : MonoBehaviour
     // 현재 위치와 같은 칸이면 아무것도 안 함
     if (target == head) return;
 
-    // 바로 직전 칸으로 되돌아간 경우 → 마지막 칸을 경로에서 제거 (되돌리기)
-    // path.Count >= 2 체크: 경로에 칸이 2개 이상 있어야 직전 칸이 존재
-    if (path.Count >= 2 && target == path[path.Count - 2])
-    {
-      path.RemoveAt(path.Count - 1);
-      Redraw();
-      return;
-    }
-
     // 맨해튼 거리 = |Δx| + |Δy|. 이 값이 1이면 상하좌우 딱 한 칸 인접
     // (대각선이면 거리가 2가 되므로 자동으로 걸러짐)
     bool adjacent = Mathf.Abs(target.x - head.x) + Mathf.Abs(target.y - head.y) == 1;
@@ -219,10 +250,94 @@ public class BoardRenderer : MonoBehaviour
     if (cells.ContainsKey(target) && adjacent && !path.Contains(target))
     {
       path.Add(target);
+      movedInGesture = true;
       if (fillSound != null) audioSource.PlayOneShot(fillSound);
+      SettingsManager.Instance?.Vibrate();  // 진동 설정이 켜져 있으면 진동
+      StartCoroutine(AnimateCellPop(cells[target]));  // 칸이 추가될 때 팝 애니메이션
       Redraw();
       CheckWin();
+      CheckStuck();  // 클리어가 아닌데 갈 곳이 없으면 자동 리셋
     }
+  }
+
+
+  // ── 막힘 감지 및 자동 리셋 ──────────────────────────────────────
+
+  // 현재 경로 끝에서 이동 가능한 칸이 하나라도 있는지 확인
+  bool HasAnyMove()
+  {
+    if (path.Count == 0) return false;
+    Vector2Int head = path[path.Count - 1];
+    Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+    foreach (var d in dirs)
+    {
+      Vector2Int next = head + d;
+      if (cells.ContainsKey(next) && !path.Contains(next))
+        return true;
+    }
+    return false;
+  }
+
+  void CheckStuck()
+  {
+    // 클리어 상태이거나 이미 리셋 중이면 무시
+    if (won || isResetting) return;
+    if (!HasAnyMove())
+      StartCoroutine(AutoReset());
+  }
+
+  IEnumerator AutoReset()
+  {
+    isResetting = true;
+
+    // 막힘을 알리기 위해 모든 칸을 빨간색으로 잠깐 표시
+    Color stuckColor = new Color(1f, 0.4f, 0.4f);
+    foreach (var kv in cells)
+      kv.Value.color = stuckColor;
+
+    yield return new WaitForSeconds(0.6f);
+
+    // ShowLevel 안에서 isResetting = false로 초기화됨
+    ShowLevel(level);
+  }
+
+
+  // ── 채워진 칸 바깥 글로우 ──────────────────────────────────────
+  // 칸보다 큰 핑크 스프라이트(glows)의 알파를 맥동시켜 외곽이 빛나는 것처럼 보이게 함
+  void AnimateGlow()
+  {
+    float t = (Mathf.Sin(Time.time * 2.5f) + 1f) * 0.5f;
+    // 알파 0.2 ↔ 0.55 사이를 맥동. 높일수록 더 선명한 글로우
+    float alpha = Mathf.Lerp(0.2f, 0.55f, t);
+
+    foreach (var kv in glows)
+    {
+      bool filled = path.Contains(kv.Key) && kv.Key != level.startCell;
+      // 채워진 칸만 글로우 표시, 나머지는 투명 유지
+      Color c = kv.Value.color;
+      c.a = filled ? alpha : 0f;
+      kv.Value.color = c;
+    }
+  }
+
+
+  // ── 칸 팝 애니메이션 ────────────────────────────────────────────
+  // 칸을 밟는 순간 톡! 하고 커졌다 원래 크기로 돌아오는 효과
+  IEnumerator AnimateCellPop(SpriteRenderer sr)
+  {
+    float duration = 0.18f;   // 애니메이션 총 시간(초). 줄이면 더 빠릿하게, 늘리면 느긋하게
+    float peak = 1.3f;        // 최대로 커지는 배율. 1.3 = 30% 더 커짐
+    float t = 0f;
+    while (t < duration)
+    {
+      t += Time.deltaTime;
+      float p = t / duration;
+      // sin(p * π): 0→1→0 곡선 → 중간에 peak까지 부풀었다가 1로 돌아옴
+      float scale = 1f + (peak - 1f) * Mathf.Sin(p * Mathf.PI);
+      sr.transform.localScale = Vector3.one * scale;
+      yield return null;
+    }
+    sr.transform.localScale = Vector3.one;  // 오차 없이 정확히 원래 크기로 복귀
   }
 
 
@@ -235,6 +350,7 @@ public class BoardRenderer : MonoBehaviour
     {
       won = true;
       if (winSound != null) audioSource.PlayOneShot(winSound);
+      SettingsManager.Instance?.Vibrate();  // 클리어 시 진동
       Redraw();                              // 클리어 색(라벤더)으로 전체 갱신
       StartCoroutine(AnimateWin());          // 클리어 직후 번쩍 연출 시작
       if (gameManager != null) gameManager.OnLevelSolved();  // GameManager에 클리어 알림

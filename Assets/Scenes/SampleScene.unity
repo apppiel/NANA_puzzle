@@ -320,6 +320,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2750f0ac9ebb24abc821f66cc570fd95, type: 2}
   - {fileID: 11400000, guid: 8c37256d258264a61aeda170077bc60a, type: 2}
   - {fileID: 11400000, guid: d4e413536d52b4fd19f8ae2882119209, type: 2}
+  - {fileID: 11400000, guid: de685cfe041e049f0ac99f5529ab22f8, type: 2}
+  - {fileID: 11400000, guid: 2aadde533381f4cb9ae090e3d1fb1953, type: 2}
   levelText: {fileID: 1154489675}
 --- !u!4 &491305860
 Transform:
@@ -417,7 +419,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.013394442, g: 0.033866823, b: 0.066037714, a: 0}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -727,8 +729,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4293292799
-  m_fontColor: {r: 1, g: 0.4481132, b: 0.9038823, a: 1}
+    rgba: 4285292655
+  m_fontColor: {r: 0.4339623, g: 0.37459952, b: 0.42343697, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -832,7 +834,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: -9, y: -433}
+  m_AnchoredPosition: {x: -9, y: -310}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1154489675
@@ -1015,7 +1017,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 0.9386792, b: 0.9386792, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1342,6 +1344,8 @@ MonoBehaviour:
   gameManager: {fileID: 491305859}
   cellPrefab: {fileID: 7090765873795338661, guid: 9c5780a94425340c28ba725f4c585e26, type: 3}
   cellSize: 1.1
+  fillSound: {fileID: 8300000, guid: 29bde6326b4c34ad8a12da475f79b50a, type: 3}
+  winSound: {fileID: 8300000, guid: a0ca8964c08d54c5dbebf245bdc474ca, type: 3}
   appearDuration: 0.22
   staggerStep: 0.03
 --- !u!4 &2104947464
