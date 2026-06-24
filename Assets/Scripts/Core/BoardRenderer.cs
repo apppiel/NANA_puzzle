@@ -38,6 +38,9 @@ public class BoardRenderer : MonoBehaviour
   Sprite cellSprite;      // 모든 칸이 공유하는 둥근 사각형 그림. Awake에서 한 번만 생성
   Material lineMaterial;  // 경로 선용 머티리얼. new Material()은 자동 해제가 안 되므로 Awake에서 한 번만 생성
   float offsetX, offsetY;  // 격자를 화면 중앙에 맞추기 위한 이동값 (ShowLevel에서 계산)
+  readonly Color lineColor = new Color(1f, 0.541f, 0.541f);  // 선·닷 공통 색상 (#ff8a8a)
+  readonly WaitForSeconds waitStuck = new WaitForSeconds(0.6f);  // 캐싱: 매번 new 하면 GC 부담
+  static readonly Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
   SpriteRenderer startDot;    // 시작점 중앙 흰 원 표시
   Sprite circleSprite;        // 원형 스프라이트 (시작/끝 닷 전용)
   bool dotAnimated = false;   // 시작 닷 팽창 애니메이션이 이미 실행됐는지
@@ -186,7 +189,7 @@ public class BoardRenderer : MonoBehaviour
     // 이 줄 없이 기본 셰이더를 쓰면 선이 분홍색(셰이더 누락) 또는 흰색으로만 표시됨
     line.material = lineMaterial;  // Awake에서 한 번만 만든 머티리얼을 재사용 (매번 new Material 하면 메모리 누수)
 
-    line.startColor = line.endColor = new Color(1f, 0.541f, 0.541f);  // 선 색상: #ff8a8a 핑크
+    line.startColor = line.endColor = lineColor;  // 선 색상: #ff8a8a 핑크
     line.startWidth = line.endWidth = 0.18f;   // 선 두께(유닛). 키우면 선이 굵어짐
     line.numCapVertices = 6;  // 선 끝부분을 몇 각형으로 둥글게 만들지 (클수록 더 동그래짐)
     line.numCornerVertices = 6;  // 꺾이는 모서리를 몇 각형으로 둥글게 만들지
@@ -225,7 +228,6 @@ public class BoardRenderer : MonoBehaviour
 
     float duration = 0.2f;
     float t = 0f;
-    Color lineColor = new Color(1f, 0.541f, 0.541f);  // 선 색상 #ff8a8a와 동일
 
     while (t < duration)
     {
@@ -246,12 +248,12 @@ public class BoardRenderer : MonoBehaviour
 
     GameObject dotObj = new GameObject("EndDot");
     dotObj.transform.SetParent(transform);
-    dotObj.transform.position = CellToWorld(path[path.Count - 1]);
+    dotObj.transform.position = CellToWorld(path[^1]);
     dotObj.transform.localScale = Vector3.zero;
 
     endDot = dotObj.AddComponent<SpriteRenderer>();
     endDot.sprite = circleSprite;
-    endDot.color = new Color(1f, 0.541f, 0.541f);  // 선 색상 #ff8a8a와 동일
+    endDot.color = lineColor;
     endDot.sortingOrder = 2;
 
     // EaseOutBack 곡선으로 0 → 0.35 크기로 팡! 등장
@@ -330,7 +332,7 @@ public class BoardRenderer : MonoBehaviour
         armed = false;
         isDrawing = true;
       }
-      else if (path.Count > 0 && c == path[path.Count - 1])
+      else if (path.Count > 0 && c == path[^1])
       {
         // 마지막 칸 탭 → 바로 드래그도 되고, 탭만 하고 떼면 armed 상태로 전환
         isDrawing = true;
@@ -359,7 +361,7 @@ public class BoardRenderer : MonoBehaviour
 
   void TryMove(Vector2Int target)
   {
-    Vector2Int head = path[path.Count - 1];  // 현재 경로의 맨 끝 칸
+    Vector2Int head = path[^1];  // 현재 경로의 맨 끝 칸
 
     // 현재 위치와 같은 칸이면 아무것도 안 함
     if (target == head) return;
@@ -398,8 +400,7 @@ public class BoardRenderer : MonoBehaviour
   bool HasAnyMove()
   {
     if (path.Count == 0) return false;
-    Vector2Int head = path[path.Count - 1];
-    Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+    Vector2Int head = path[^1];
     foreach (var d in dirs)
     {
       Vector2Int next = head + d;
@@ -427,7 +428,7 @@ public class BoardRenderer : MonoBehaviour
     foreach (var kv in cells)
       kv.Value.color = stuckColor;
 
-    yield return new WaitForSeconds(0.6f);
+    yield return waitStuck;
 
     // ShowLevel 안에서 isResetting = false로 초기화됨
     ShowLevel(level);
