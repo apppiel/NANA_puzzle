@@ -38,6 +38,10 @@ public class BoardRenderer : MonoBehaviour
   Sprite cellSprite;      // 모든 칸이 공유하는 둥근 사각형 그림. Awake에서 한 번만 생성
   Material lineMaterial;  // 경로 선용 머티리얼. new Material()은 자동 해제가 안 되므로 Awake에서 한 번만 생성
   float offsetX, offsetY;  // 격자를 화면 중앙에 맞추기 위한 이동값 (ShowLevel에서 계산)
+  SpriteRenderer startDot;    // 시작점 중앙 흰 원 표시
+  Sprite circleSprite;        // 원형 스프라이트 (시작/끝 닷 전용)
+  bool dotAnimated = false;   // 시작 닷 팽창 애니메이션이 이미 실행됐는지
+  SpriteRenderer endDot;      // 클리어 시 마지막 칸 중앙 흰 원
   int fillableCount;     // 채워야 할 칸의 총 수. path.Count가 이 값과 같아지면 클리어
   bool isDrawing = false;      // 현재 손가락을 누르고 있는 중인지 여부
   bool armed = false;          // 마지막 칸 탭 후 이어그리기 대기 중
@@ -67,6 +71,7 @@ public class BoardRenderer : MonoBehaviour
     // Awake는 Start보다 먼저 실행됨
     // 스프라이트를 여기서 만들어야, 곧바로 호출될 수 있는 ShowLevel() 안에서 안전하게 사용 가능
     cellSprite = MakeRoundedSprite(256, 64);
+    circleSprite = MakeCircleSprite(128);
     lineMaterial = new Material(Shader.Find("Sprites/Default"));  // 레벨이 바뀌어도 재사용
     audioSource = gameObject.AddComponent<AudioSource>();
     audioSource.playOnAwake = false;
@@ -92,6 +97,8 @@ public class BoardRenderer : MonoBehaviour
 
     DrawBoard();    // 칸 오브젝트 생성
     CreateLine();   // 경로 선 오브젝트 생성
+    dotAnimated = false;
+    CreateStartDot();  // 시작점 흰 원 생성
 
     // DrawBoard() 다음에 세야 막힌 칸이 제외된 실제 칸 수를 얻을 수 있음
     fillableCount = cells.Count;
@@ -118,6 +125,8 @@ public class BoardRenderer : MonoBehaviour
     cells.Clear();
     glows.Clear();
     path.Clear();
+    startDot = null;
+    endDot = null;  // Destroy로 제거됐으므로 참조도 비움
   }
 
   void DrawBoard()
@@ -177,13 +186,114 @@ public class BoardRenderer : MonoBehaviour
     // 이 줄 없이 기본 셰이더를 쓰면 선이 분홍색(셰이더 누락) 또는 흰색으로만 표시됨
     line.material = lineMaterial;  // Awake에서 한 번만 만든 머티리얼을 재사용 (매번 new Material 하면 메모리 누수)
 
-    line.startColor = line.endColor = new Color(1f, 0.761f, 0.761f);  // 선 색상: #ffc2c2 연한 핑크
+    line.startColor = line.endColor = new Color(1f, 0.541f, 0.541f);  // 선 색상: #ff8a8a 핑크
     line.startWidth = line.endWidth = 0.18f;   // 선 두께(유닛). 키우면 선이 굵어짐
     line.numCapVertices = 6;  // 선 끝부분을 몇 각형으로 둥글게 만들지 (클수록 더 동그래짐)
     line.numCornerVertices = 6;  // 꺾이는 모서리를 몇 각형으로 둥글게 만들지
     line.sortingOrder = 1;       // 칸 스프라이트(기본 order=0) 위에 선이 그려지도록 1로 설정
     line.useWorldSpace = true;
     line.positionCount = 0;      // 아직 경로가 없으므로 점 0개로 시작
+  }
+
+  // ── 시작점 닷 ───────────────────────────────────────────────────
+
+  void CreateStartDot()
+  {
+    GameObject dotObj = new GameObject("StartDot");
+    dotObj.transform.SetParent(transform);
+    dotObj.transform.position = CellToWorld(level.startCell);
+    dotObj.transform.localScale = Vector3.one * 0.35f;  // 칸 크기의 35%
+
+    startDot = dotObj.AddComponent<SpriteRenderer>();
+    startDot.sprite = circleSprite;
+    startDot.color = Color.white;
+    startDot.sortingOrder = 2;  // 선(1)보다 위에 그려짐
+  }
+
+  void ResetStartDot()
+  {
+    if (startDot == null) return;
+    startDot.gameObject.SetActive(true);
+    startDot.transform.localScale = Vector3.one * 0.35f;
+    startDot.color = Color.white;
+  }
+
+  // 첫 이동 시 원이 흰색 → 선 색으로 채워지고 그대로 유지
+  IEnumerator AnimateStartDot()
+  {
+    if (startDot == null) yield break;
+
+    float duration = 0.2f;
+    float t = 0f;
+    Color lineColor = new Color(1f, 0.541f, 0.541f);  // 선 색상 #ff8a8a와 동일
+
+    while (t < duration)
+    {
+      t += Time.deltaTime;
+      float p = Mathf.Clamp01(t / duration);
+      if (startDot == null) yield break;
+      startDot.color = Color.Lerp(Color.white, lineColor, p);
+      yield return null;
+    }
+
+    if (startDot != null) startDot.color = lineColor;
+  }
+
+  // 클리어 시 마지막 칸에 흰 원이 팡! 하고 등장
+  IEnumerator AnimateEndDot()
+  {
+    if (path.Count == 0) yield break;
+
+    GameObject dotObj = new GameObject("EndDot");
+    dotObj.transform.SetParent(transform);
+    dotObj.transform.position = CellToWorld(path[path.Count - 1]);
+    dotObj.transform.localScale = Vector3.zero;
+
+    endDot = dotObj.AddComponent<SpriteRenderer>();
+    endDot.sprite = circleSprite;
+    endDot.color = new Color(1f, 0.541f, 0.541f);  // 선 색상 #ff8a8a와 동일
+    endDot.sortingOrder = 2;
+
+    // EaseOutBack 곡선으로 0 → 0.35 크기로 팡! 등장
+    float duration = 0.28f;
+    float t = 0f;
+    while (t < duration)
+    {
+      t += Time.deltaTime;
+      float p = Mathf.Clamp01(t / duration);
+      if (endDot == null) yield break;
+      endDot.transform.localScale = Vector3.one * EaseOutBack(p) * 0.35f;
+      yield return null;
+    }
+
+    if (endDot != null) endDot.transform.localScale = Vector3.one * 0.35f;
+  }
+
+  // 안티앨리어싱이 적용된 원형 스프라이트 생성
+  Sprite MakeCircleSprite(int size)
+  {
+    Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+    tex.wrapMode = TextureWrapMode.Clamp;
+    tex.filterMode = FilterMode.Bilinear;
+
+    float center = (size - 1) / 2f;
+    float r = center - 0.5f;
+
+    for (int py = 0; py < size; py++)
+    {
+      for (int px = 0; px < size; px++)
+      {
+        float dx = px - center;
+        float dy = py - center;
+        float dist = Mathf.Sqrt(dx * dx + dy * dy);
+        // 경계 부근 1픽셀을 선형 보간해 부드러운 원 가장자리 처리
+        float alpha = Mathf.Clamp01(r - dist + 0.5f);
+        tex.SetPixel(px, py, new Color(1f, 1f, 1f, alpha));
+      }
+    }
+
+    tex.Apply();
+    return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
   }
 
 
@@ -210,6 +320,8 @@ public class BoardRenderer : MonoBehaviour
         isDrawing = true;
         path.Clear();
         path.Add(level.startCell);
+        dotAnimated = false;
+        ResetStartDot();  // 흰 원 원래 상태로 복원
         Redraw();
       }
       else if (armed)
@@ -263,6 +375,12 @@ public class BoardRenderer : MonoBehaviour
     if (cells.ContainsKey(target) && adjacent && !path.Contains(target))
     {
       path.Add(target);
+      // 시작 칸에서 첫 이동 시 흰 원 팽창 애니메이션 실행
+      if (path.Count == 2 && !dotAnimated)
+      {
+        dotAnimated = true;
+        StartCoroutine(AnimateStartDot());
+      }
       movedInGesture = true;
       if (fillSound != null) audioSource.PlayOneShot(fillSound);
       if (SettingsManager.Instance != null) SettingsManager.Instance.Vibrate();  // 진동 설정이 켜져 있으면 진동
@@ -366,6 +484,7 @@ public class BoardRenderer : MonoBehaviour
       if (winSound != null) audioSource.PlayOneShot(winSound);
       if (SettingsManager.Instance != null) SettingsManager.Instance.Vibrate();  // 클리어 시 진동
       Redraw();                              // 클리어 색(라벤더)으로 전체 갱신
+      StartCoroutine(AnimateEndDot());       // 마지막 칸에 흰 원 팝 등장
       StartCoroutine(AnimateWin());          // 클리어 직후 번쩍 연출 시작
       if (gameManager != null) gameManager.OnLevelSolved();  // GameManager에 클리어 알림
     }
