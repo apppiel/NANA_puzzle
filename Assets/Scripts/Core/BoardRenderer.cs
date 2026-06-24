@@ -12,6 +12,7 @@ public class BoardRenderer : MonoBehaviour
   public float cellSize = 1.1f;    // 칸 사이 간격(유닛). 1.0이면 딱 붙고, 1.1이면 약간 간격이 생김
   public AudioClip fillSound;      // 칸을 채울 때 재생할 효과음. 인스펙터에서 AudioClip 연결
   public AudioClip winSound;       // 클리어 시 재생할 효과음. 인스펙터에서 AudioClip 연결
+  public AudioClip stuckSound;     // 막힘 감지 시 재생할 효과음. 인스펙터에서 AudioClip 연결
 
   // ── 칸 색상 ─────────────────────────────────────────────────────
   // public으로 선언해 인스펙터에서 직접 색을 바꿀 수 있음. 코드 수정 없이 테마 변경 가능
@@ -290,6 +291,7 @@ public class BoardRenderer : MonoBehaviour
   {
     isResetting = true;
 
+    if (stuckSound != null) audioSource.PlayOneShot(stuckSound);
     // 막힘을 알리기 위해 모든 칸을 빨간색으로 잠깐 표시
     Color stuckColor = new Color(1f, 0.4f, 0.4f);
     foreach (var kv in cells)
