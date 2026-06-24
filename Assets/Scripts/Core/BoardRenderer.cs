@@ -20,6 +20,7 @@ public class BoardRenderer : MonoBehaviour
   public Color startColor = new Color(1f, 0.8f, 0.2f);              // 시작 칸 → 노란색
   public Color filledColor = new Color(0.996f, 0.871f, 0.871f);     // 경로 칸 → 연한 핑크
   public Color winColor = new Color(0.72f, 0.52f, 0.95f);           // 클리어 시 → 라벤더
+  public Color outlineColor = new Color(0.75f, 0.75f, 0.75f, 0.8f);  // 외곽선 → 연한 회색
   // ── 런타임 데이터 ───────────────────────────────────────────────
   // 격자 좌표(Vector2Int) → 해당 칸의 SpriteRenderer
   // Dictionary를 쓰는 이유: "이 좌표에 칸이 있는지" 확인하고 색을 바꿀 때 O(1)로 빠르게 접근 가능
@@ -138,6 +139,17 @@ public class BoardRenderer : MonoBehaviour
         sr.sprite = cellSprite;   // 프리팹 기본 스프라이트 대신 코드로 만든 둥근 사각형으로 교체
         cells[coord] = sr;
 
+        // 칸 뒤에 외곽선 추가 (칸보다 살짝 큰 스프라이트 → 테두리처럼 보임)
+        GameObject outlineObj = new GameObject("Outline");
+        outlineObj.transform.SetParent(obj.transform);
+        outlineObj.transform.localPosition = new Vector3(0.04f, -0.04f, 0f);  // 오른쪽·아래로 오프셋 → 해당 방향만 테두리 노출
+        outlineObj.transform.localScale = Vector3.one * 1.05f;  // 8% 크게. 키우면 테두리 두꺼워짐
+
+        SpriteRenderer outlineSr = outlineObj.AddComponent<SpriteRenderer>();
+        outlineSr.sprite = cellSprite;
+        outlineSr.color = outlineColor;
+        outlineSr.sortingOrder = -1;  // 칸(order 0) 뒤에 그려짐
+
         // 칸 뒤에 글로우 스프라이트 추가 (처음엔 투명, 채워질 때 맥동)
         GameObject glowObj = new GameObject("Glow");
         glowObj.transform.SetParent(obj.transform);
@@ -146,8 +158,8 @@ public class BoardRenderer : MonoBehaviour
 
         SpriteRenderer glowSr = glowObj.AddComponent<SpriteRenderer>();
         glowSr.sprite = cellSprite;
-        glowSr.color = new Color(1f, 1f, 1f, 0.5f);  // 진한 핑크, 처음엔 완전 투명
-        glowSr.sortingOrder = -1;  // 칸(order 0) 뒤에 그려짐
+        glowSr.color = new Color(1f, 1f, 1f, 0f);  // 처음엔 완전 투명
+        glowSr.sortingOrder = -2;  // 외곽선(-1) 뒤에 그려짐
 
         glows[coord] = glowSr;
       }
