@@ -43,15 +43,12 @@ public class GameManager : MonoBehaviour
   // BoardRenderer가 레벨을 다 채우면 호출
   public void OnLevelSolved()
   {
-    Debug.Log("클리어!");
     StartCoroutine(GoToNextAfterDelay());
   }
 
   IEnumerator GoToNextAfterDelay()
   {
     yield return new WaitForSeconds(1.0f);
-    // ↑ 0.6 → 0.8으로 늘림. AnimateWin 번쩍 연출(~0.35s + stagger 여분)을 다 보고 넘어가게.
-    //   연출이 너무 빨리 끊긴다 싶으면 1.0~1.2 정도로 올릴 것.
     NextLevel();
   }
 

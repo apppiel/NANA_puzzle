@@ -31,6 +31,7 @@ public class BoardRenderer : MonoBehaviour
   // 순서가 필요한 이유 1: 되돌리기 → 마지막 칸(path[끝])을 제거
   // 순서가 필요한 이유 2: 선 그리기 → 순서대로 점을 연결해야 경로선이 올바르게 그려짐
   List<Vector2Int> path = new List<Vector2Int>();
+  HashSet<Vector2Int> pathSet = new HashSet<Vector2Int>(); // path와 항상 동기화. Contains를 O(1)로 만들기 위해 병행 사용
 
   LevelData level;       // 현재 표시 중인 레벨 데이터 (GameManager가 ShowLevel로 넘겨줌)
   LineRenderer line;      // 경로 위에 그려지는 선. CreateLine()에서 생성
@@ -80,6 +81,11 @@ public class BoardRenderer : MonoBehaviour
     audioSource.playOnAwake = false;
   }
 
+  void OnDestroy()
+  {
+    if (lineMaterial != null) Destroy(lineMaterial);
+  }
+
   // GameManager가 "이 레벨 그려줘" 하고 호출하는 함수 (외부에서 부를 수 있도록 public)
   public void ShowLevel(LevelData newLevel)
   {
@@ -108,6 +114,7 @@ public class BoardRenderer : MonoBehaviour
 
     // 시작 칸을 경로의 첫 번째 칸으로 추가 (시작 칸은 이미 밟은 상태로 시작)
     path.Add(level.startCell);
+    pathSet.Add(level.startCell);
 
     Redraw();       // 색상·선 초기 반영
     FitCamera();    // 레벨 크기에 맞게 카메라 범위 자동 조정
@@ -128,6 +135,7 @@ public class BoardRenderer : MonoBehaviour
     cells.Clear();
     glows.Clear();
     path.Clear();
+    pathSet.Clear();
     startDot = null;
     endDot = null;  // Destroy로 제거됐으므로 참조도 비움
   }
@@ -321,7 +329,9 @@ public class BoardRenderer : MonoBehaviour
         armed = false;
         isDrawing = true;
         path.Clear();
+        pathSet.Clear();
         path.Add(level.startCell);
+        pathSet.Add(level.startCell);
         dotAnimated = false;
         ResetStartDot();  // 흰 원 원래 상태로 복원
         Redraw();
@@ -374,9 +384,10 @@ public class BoardRenderer : MonoBehaviour
     // 1. cells에 있는 칸(막힌 칸이 아님)
     // 2. 인접한 칸(대각선 이동 불가)
     // 3. 아직 경로에 포함되지 않은 칸(이미 지난 칸 재방문 불가)
-    if (cells.ContainsKey(target) && adjacent && !path.Contains(target))
+    if (cells.ContainsKey(target) && adjacent && !pathSet.Contains(target))
     {
       path.Add(target);
+      pathSet.Add(target);
       // 시작 칸에서 첫 이동 시 흰 원 팽창 애니메이션 실행
       if (path.Count == 2 && !dotAnimated)
       {
@@ -404,7 +415,7 @@ public class BoardRenderer : MonoBehaviour
     foreach (var d in dirs)
     {
       Vector2Int next = head + d;
-      if (cells.ContainsKey(next) && !path.Contains(next))
+      if (cells.ContainsKey(next) && !pathSet.Contains(next))
         return true;
     }
     return false;
@@ -445,7 +456,7 @@ public class BoardRenderer : MonoBehaviour
 
     foreach (var kv in glows)
     {
-      bool filled = path.Contains(kv.Key) && kv.Key != level.startCell;
+      bool filled = pathSet.Contains(kv.Key) && kv.Key != level.startCell;
       // 채워진 칸만 글로우 표시, 나머지는 투명 유지
       Color c = kv.Value.color;
       c.a = filled ? alpha : 0f;
@@ -504,7 +515,7 @@ public class BoardRenderer : MonoBehaviour
 
       if (won)
         sr.color = winColor;                                          // 클리어 → 전부 초록
-      else if (path.Contains(c))
+      else if (pathSet.Contains(c))
         sr.color = (c == level.startCell) ? startColor : filledColor; // 경로 칸 → 시작은 노랑, 나머지는 파랑
       else
         sr.color = emptyColor;                                        // 아직 안 지난 칸 → 회색
