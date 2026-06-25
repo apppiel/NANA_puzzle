@@ -9,6 +9,7 @@ public class GameManager : MonoBehaviour
   public TMP_Text levelText;         // 레벨 번호 표시용
   public TMP_Text roundCountText;    // 현재라운드 / 전체라운드 표시용. 인스펙터에서 TMP Text 연결
   public RewardManager rewardManager; // 모든 레벨 클리어 시 보상 처리. 인스펙터에서 연결
+  public AdManager adManager;         // 전면 광고 관리. 인스펙터에서 연결
 
   // PlayerPrefs에 저장할 키. 문자열 오타를 방지하기 위해 const로 선언
   const string ProgressKey = "currentLevel";
@@ -61,6 +62,8 @@ public class GameManager : MonoBehaviour
     }
     else
     {
+      // 광고 카운트 증가 (N레벨마다 전면 광고 표시)
+      if (adManager != null) adManager.OnLevelCleared();
       NextLevel();
     }
   }
