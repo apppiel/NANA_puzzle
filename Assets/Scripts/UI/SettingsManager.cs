@@ -43,7 +43,10 @@ public class SettingsManager : MonoBehaviour
   // BoardRenderer 등 다른 스크립트에서 이 함수만 호출하면 설정에 따라 진동 여부가 결정됨
   public void Vibrate()
   {
+    // 에디터에서는 Handheld.Vibrate()가 iPhoneUtils 경고 로그를 띄우므로 실기기에서만 호출
+#if !UNITY_EDITOR
     if (VibrationOn) Handheld.Vibrate();
+#endif
   }
 
   void ApplySound()

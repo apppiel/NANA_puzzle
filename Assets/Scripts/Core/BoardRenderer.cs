@@ -396,7 +396,6 @@ public class BoardRenderer : MonoBehaviour
       }
       movedInGesture = true;
       if (fillSound != null) audioSource.PlayOneShot(fillSound);
-      if (SettingsManager.Instance != null) SettingsManager.Instance.Vibrate();  // 진동 설정이 켜져 있으면 진동
       StartCoroutine(AnimateCellPop(cells[target]));  // 칸이 추가될 때 팝 애니메이션
       Redraw();
       CheckWin();
@@ -434,6 +433,7 @@ public class BoardRenderer : MonoBehaviour
     isResetting = true;
 
     if (stuckSound != null) audioSource.PlayOneShot(stuckSound);
+    if (SettingsManager.Instance != null) SettingsManager.Instance.Vibrate();  // 막혀서 리셋될 때 진동
     // 막힘을 알리기 위해 모든 칸을 빨간색으로 잠깐 표시
     Color stuckColor = new Color(1f, 0.4f, 0.4f);
     foreach (var kv in cells)
