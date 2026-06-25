@@ -4,10 +4,11 @@ using TMPro;
 
 public class GameManager : MonoBehaviour
 {
-  public BoardRenderer board;     // 판을 그리는 친구. 인스펙터에서 Board 오브젝트 연결
-  public LevelData[] levels;      // 레벨 목록 (순서대로). 인스펙터에서 드래그로 추가
-  public TMP_Text levelText;       // 레벨 번호 표시용
-  public TMP_Text roundCountText;  // 현재라운드 / 전체라운드 표시용. 인스펙터에서 TMP Text 연결
+  public BoardRenderer board;        // 판을 그리는 친구. 인스펙터에서 Board 오브젝트 연결
+  public LevelData[] levels;         // 레벨 목록 (순서대로). 인스펙터에서 드래그로 추가
+  public TMP_Text levelText;         // 레벨 번호 표시용
+  public TMP_Text roundCountText;    // 현재라운드 / 전체라운드 표시용. 인스펙터에서 TMP Text 연결
+  public RewardManager rewardManager; // 모든 레벨 클리어 시 보상 처리. 인스펙터에서 연결
 
   // PlayerPrefs에 저장할 키. 문자열 오타를 방지하기 위해 const로 선언
   const string ProgressKey = "currentLevel";
@@ -43,21 +44,32 @@ public class GameManager : MonoBehaviour
   // BoardRenderer가 레벨을 다 채우면 호출
   public void OnLevelSolved()
   {
-    StartCoroutine(GoToNextAfterDelay());
+    // 마지막 레벨 클리어 여부 판단
+    bool isLastLevel = currentIndex == levels.Length - 1;
+    StartCoroutine(GoToNextAfterDelay(isLastLevel));
   }
 
-  IEnumerator GoToNextAfterDelay()
+  IEnumerator GoToNextAfterDelay(bool isLastLevel)
   {
     yield return new WaitForSeconds(1.0f);
-    NextLevel();
+
+    if (isLastLevel)
+    {
+      // 모든 레벨 클리어 → 보상 코드 발급
+      if (rewardManager != null)
+        rewardManager.ShowReward();
+    }
+    else
+    {
+      NextLevel();
+    }
   }
 
   // UI Button의 OnClick에서 호출
   public void RestartLevel() { LoadLevel(currentIndex); }
   public void NextLevel()
   {
-    // 마지막 레벨 클리어 시 처음으로 돌아감 (PlayerPrefs도 0으로 저장)
     int next = currentIndex + 1;
-    LoadLevel(next >= levels.Length ? 0 : next);
+    if (next < levels.Length) LoadLevel(next);
   }
 }

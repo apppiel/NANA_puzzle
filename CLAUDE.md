@@ -14,17 +14,21 @@
 
 ## 폴더 구조
 - Assets/Scripts/Data  — 데이터 정의 (LevelData)
-- Assets/Scripts/Core  — 게임 로직 (BoardRenderer, GameManager)
-- Assets/Scripts/UI    — UI (예정)
+- Assets/Scripts/Core  — 게임 로직 (BoardRenderer, GameManager, RewardManager)
+- Assets/Scripts/UI    — UI (LoadingScreen, SettingsPanel, SettingsManager)
 - Assets/Levels        — 레벨 데이터 에셋 (Level_1 등)
 - Assets/Art           — 스프라이트/프리팹 (Cell 프리팹)
 - Assets/Casual Game Sounds U6 — 효과음 에셋 (DM-CGS-01~50.wav)
+- Assets/Firebase      — Firebase SDK (FirebaseApp, Firestore)
+- Assets/ExternalDependencyManager — Firebase EDM4U
 
 ## 핵심 파일
 - LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
 - BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
-- GameManager.cs: 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 레벨 번호 텍스트(LevelText) 표시. 게임 전체 흐름을 결정.
+- GameManager.cs: 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 레벨 번호 텍스트(LevelText) 표시. 마지막 레벨 클리어 시 RewardManager.ShowReward() 호출.
+- RewardManager.cs: 모든 레벨 클리어 시 랜덤 인증코드(예: A3K9-XZ21) 생성. Firebase Firestore에 기기 ID 키로 저장(중복 방지). RewardPanel UI에 코드 표시 및 복사 버튼 제공.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
+- Assets/google-services.json: Firebase 프로젝트 설정 파일. 패키지명 com.nanaBox.NANApuzzle.
 
 ## 게임 규칙 / 데이터 모델
 - 칸 좌표는 Vector2Int (x=열, y=행), (0,0)은 왼쪽 아래.
@@ -53,9 +57,14 @@
 - [x] 시작 칸 중앙 흰 원: 첫 이동 시 선 색으로 채워지며 유지
 - [x] 클리어 시 마지막 칸에 같은 색 원 팝 등장
 - [x] 리팩터링: path[^1], static readonly dirs, WaitForSeconds 캐싱
+- [x] 셋팅창 제작 (사운드, 진동)
+- [x] Firebase Firestore 연동 (SDK 13.13.0)
+- [x] 모든 레벨 클리어 시 랜덤 인증코드 발급 + Firestore 저장 (중복 방지)
+- [x] RewardPanel UI (코드 표시 + 복사 버튼)
 
 ## 다음 할 일 (TODO)
-- [ ] 셋팅창 제작 ( 사운드 , 진동 )
+- [ ] Firestore 보안 규칙 수정 (출시 전 필수 — 현재 테스트 모드, 30일 후 차단됨)
+  - Firebase 콘솔 → Firestore → 규칙 탭에서 rewards 컬렉션 쓰기 최초 1회만 허용으로 변경
 - [ ] (나중에) 절차적 레벨 생성 검토
 - [ ] 광고 SDK 삽입
 
