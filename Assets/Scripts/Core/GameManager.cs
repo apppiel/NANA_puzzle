@@ -76,6 +76,7 @@ public class GameManager : MonoBehaviour
 
   // UI Button의 OnClick에서 호출
   public void RestartLevel() { LoadLevel(currentIndex); }
+  public void GoToLevel1() { LoadLevel(0); }
   public void NextLevel()
   {
     int next = currentIndex + 1;

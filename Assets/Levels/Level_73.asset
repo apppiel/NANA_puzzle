@@ -12,7 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5cffaa7257c7147a78795255a96092b1, type: 3}
   m_Name: Level_73
   m_EditorClassIdentifier: 
-  width: 5
-  height: 5
-  startCell: {x: 0, y: 0}
-  blockedCells: []
+  width: 13
+  height: 11
+  startCell: {x: 6, y: 2}
+  blockedCells:
+  - {x: 0, y: 0}
+  - {x: 0, y: 0}
+  - {x: 0, y: 0}
+  - {x: 0, y: 0}

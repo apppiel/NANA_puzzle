@@ -13,6 +13,7 @@ public class RewardManager : MonoBehaviour
     public TMP_Text codeText;       // 인증코드 텍스트
     public TMP_Text statusText;     // 상태 메시지 텍스트 ("저장 중...", "발급 완료" 등)
     public Button copyButton;       // 코드 복사 버튼
+    public GameManager gameManager; // 레벨 이동용. 인스펙터에서 연결
 
     FirebaseFirestore db;
     bool firebaseReady = false;
@@ -85,6 +86,20 @@ public class RewardManager : MonoBehaviour
                 });
             }
         });
+    }
+
+    // "현재 레벨 유지" 버튼 OnClick에 연결 — 패널 닫고 마지막 레벨 재시작
+    public void OnKeepLevel()
+    {
+        if (rewardPanel != null) rewardPanel.SetActive(false);
+        if (gameManager != null) gameManager.RestartLevel();
+    }
+
+    // "1레벨로 돌아가기" 버튼 OnClick에 연결 — 패널 닫고 1레벨로 이동
+    public void OnRestartFromLevel1()
+    {
+        if (rewardPanel != null) rewardPanel.SetActive(false);
+        if (gameManager != null) gameManager.GoToLevel1();
     }
 
     // 복사 버튼 OnClick에 연결
