@@ -28,7 +28,7 @@
 - BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
 - GameManager.cs: 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 레벨 번호 텍스트(LevelText) 표시. 마지막 레벨 클리어 시 RewardManager.ShowReward() 호출.
 - RewardManager.cs: 모든 레벨 클리어 시 랜덤 인증코드(예: A3K9-XZ21) 생성. Firebase Firestore에 기기 ID 키로 저장(중복 방지). RewardPanel UI에 코드 표시 및 복사 버튼 제공.
-- AdManager.cs: 전면 광고 로드/표시 담당. N레벨마다 광고 표시 (기본 3레벨, 인스펙터 조정 가능). GameManager의 Ad Manager 필드에 연결 필수. useTestAd 체크 해제 시 실제 광고로 전환.
+- AdManager.cs: 전면 광고 로드/표시 담당. N레벨마다 광고 표시 (기본 3레벨) + 막혀서 리셋 N번마다 광고 표시 (기본 4번). 인스펙터에서 횟수 조정 가능. useTestAd 체크 해제 시 실제 광고로 전환.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 - Assets/google-services.json: Firebase 프로젝트 설정 파일. 패키지명 com.nanaBox.NANApuzzle.
 
@@ -64,6 +64,8 @@
 - [x] 모든 레벨 클리어 시 랜덤 인증코드 발급 + Firestore 저장 (중복 방지)
 - [x] RewardPanel UI (코드 표시 + 복사 버튼)
 - [x] Google AdMob 전면 광고 연동 (SDK 11.2.0, 3레벨마다 표시, 실기기 테스트 완료)
+- [x] 막힘 리셋 N번마다 전면 광고 표시 (기본 4번, AdManager.showAdEveryNStucks로 조정)
+- [x] 레벨 73개 제작 완료 (Level_1 ~ Level_73)
 
 ## 다음 할 일 (TODO)
 - [ ] Firestore 보안 규칙 수정 (출시 전 필수 — 현재 테스트 모드, 30일 후 차단됨)
