@@ -68,6 +68,12 @@ public class GameManager : MonoBehaviour
     }
   }
 
+  // BoardRenderer가 막혀서 리셋될 때 호출 → 광고 카운트 증가
+  public void OnStuckReset()
+  {
+    if (adManager != null) adManager.OnStuckReset();
+  }
+
   // UI Button의 OnClick에서 호출
   public void RestartLevel() { LoadLevel(currentIndex); }
   public void NextLevel()

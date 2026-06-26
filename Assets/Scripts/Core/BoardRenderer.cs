@@ -443,6 +443,9 @@ public class BoardRenderer : MonoBehaviour
 
     // ShowLevel 안에서 isResetting = false로 초기화됨
     ShowLevel(level);
+
+    // 막힘 리셋 횟수를 GameManager에 알림 → AdManager가 N번마다 광고 표시
+    if (gameManager != null) gameManager.OnStuckReset();
   }
 
 

@@ -322,10 +322,14 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d4e413536d52b4fd19f8ae2882119209, type: 2}
   - {fileID: 11400000, guid: de685cfe041e049f0ac99f5529ab22f8, type: 2}
   - {fileID: 11400000, guid: 2aadde533381f4cb9ae090e3d1fb1953, type: 2}
+  - {fileID: 11400000, guid: 2ad02156e38a94b5aa6583e87acd85cd, type: 2}
+  - {fileID: 11400000, guid: 9f3e2a1b4c5d6e7f8a9b0c1d2e3f4a5b, type: 2}
+  - {fileID: 11400000, guid: 217593bee9ffe4e6a814eed2e7c4c21d, type: 2}
+  - {fileID: 11400000, guid: 635fa36e1cf4b42e79889336744da145, type: 2}
   levelText: {fileID: 1154489675}
   roundCountText: {fileID: 1561126345}
   rewardManager: {fileID: 1044326912}
-  adManager: {fileID: 0}
+  adManager: {fileID: 1052090715}
 --- !u!4 &491305860
 Transform:
   m_ObjectHideFlags: 0
@@ -1348,7 +1352,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   useTestAd: 1
-  showEveryNLevels: 1
+  showEveryNLevels: 3
 --- !u!4 &1052090716
 Transform:
   m_ObjectHideFlags: 0
@@ -1484,7 +1488,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: -9, y: -92}
+  m_AnchoredPosition: {x: -9, y: -191}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1154489675
@@ -2365,7 +2369,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 5, y: -207}
+  m_AnchoredPosition: {x: 5, y: -306}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1561126345

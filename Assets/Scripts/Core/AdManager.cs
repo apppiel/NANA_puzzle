@@ -13,8 +13,12 @@ public class AdManager : MonoBehaviour
     // 몇 레벨마다 광고를 보여줄지 (3 = 3레벨 클리어마다 1번)
     [SerializeField] int showEveryNLevels = 3;
 
+    // 몇 번 막혀서 리셋될 때마다 광고를 보여줄지 (4 = 4번 막힐 때마다 1번)
+    [SerializeField] int showAdEveryNStucks = 4;
+
     InterstitialAd interstitialAd;
     int levelClearCount = 0; // 현재 세션에서 클리어한 레벨 수
+    int stuckResetCount = 0; // 현재 세션에서 막혀서 리셋된 횟수
 
     void Start()
     {
@@ -59,6 +63,25 @@ public class AdManager : MonoBehaviour
         else
         {
             // 광고가 준비 안 됐으면 미리 로드만 해둠
+            LoadAd();
+        }
+    }
+
+    // BoardRenderer가 막혀서 리셋될 때마다 GameManager를 통해 호출
+    public void OnStuckReset()
+    {
+        stuckResetCount++;
+
+        // N번 막힐 때마다 광고 표시
+        if (stuckResetCount % showAdEveryNStucks != 0) return;
+
+        if (interstitialAd != null && interstitialAd.CanShowAd())
+        {
+            interstitialAd.OnAdFullScreenContentClosed += () => LoadAd();
+            interstitialAd.Show();
+        }
+        else
+        {
             LoadAd();
         }
     }
