@@ -449,11 +449,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   board: {fileID: 2104947463}
   levels:
-  - {fileID: 11400000, guid: 61e03fd58de3e46e58a00616c8421ce3, type: 2}
-  - {fileID: 11400000, guid: 2750f0ac9ebb24abc821f66cc570fd95, type: 2}
-  - {fileID: 11400000, guid: 8c37256d258264a61aeda170077bc60a, type: 2}
-  - {fileID: 11400000, guid: d4e413536d52b4fd19f8ae2882119209, type: 2}
-  - {fileID: 11400000, guid: e561c17a52e6144c6a4ee94b41868e31, type: 2}
+  - {fileID: 11400000, guid: 50e8b1541a30b43c4a051b5a5c79e5c5, type: 2}
   levelText: {fileID: 1154489675}
   roundCountText: {fileID: 1561126345}
   rewardManager: {fileID: 1044326912}
@@ -1674,7 +1670,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: -8
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
@@ -2313,8 +2309,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 1.5717773, y: 1.5717163}
-  m_SizeDelta: {x: 105.7455, y: 105.7454}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1464535923
 MonoBehaviour:
@@ -2363,9 +2359,9 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -4298544249881405218, guid: bda8c221b46f14243a4e0ec449566f4d, type: 3}
+  m_Sprite: {fileID: 3907721248601932646, guid: 9204e4f770ec746fe9dd22d048620f7e, type: 3}
   m_Type: 0
-  m_PreserveAspect: 0
+  m_PreserveAspect: 1
   m_FillCenter: 1
   m_FillMethod: 4
   m_FillAmount: 1
@@ -2554,7 +2550,7 @@ MonoBehaviour:
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
   m_textAlignment: 65535
-  m_characterSpacing: 0
+  m_characterSpacing: -8
   m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0

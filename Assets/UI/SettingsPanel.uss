@@ -1,0 +1,107 @@
+/* CSS랑 거의 똑같아요 */
+
+/* 화면 전체를 덮는 반투명 어두운 배경 */
+.overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+    align-items: center;
+    justify-content: center;
+}
+
+/* 가운데 흰 카드 */
+.panel-card {
+    background-color: rgb(255, 255, 255);
+    border-radius: 28px;
+    padding: 52px 56px;
+    width: 520px;
+    align-items: stretch;
+    /* 폰트는 panel-card에만 설정하면 자식 요소(title, label, button)에 자동으로 상속됨 */
+    -unity-font: url("../TextMesh Pro/Fonts/NanumSquareRoundEB.ttf");
+}
+
+/* 제목 */
+.title {
+    font-size: 36px;
+    -unity-font-style: bold;
+    -unity-text-align: upper-center;
+    color: rgb(60, 60, 60);
+    margin-bottom: 36px;
+}
+
+/* 설정 한 줄 (라벨 + 토글) */
+.setting-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+}
+
+.setting-label {
+    font-size: 24px;
+    color: rgb(60, 60, 60);
+}
+
+/* 토글의 기본 라벨 텍스트 숨김 (우리가 직접 Label 쓰니까) */
+.setting-toggle > .unity-label {
+    display: none;
+}
+
+/* 트랙: 꺼짐 상태 → 회색 pill */
+.setting-toggle > .unity-toggle__input {
+    background-color: rgb(210, 210, 210);
+    border-radius: 30px;
+    border-width: 0;
+    width: 76px;
+    height: 40px;
+    padding: 5px;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+/* 노브(동그란 흰 원): 기본 체크마크 이미지를 투명하게 만들고 원으로 스타일 */
+.setting-toggle > .unity-toggle__input > .unity-toggle__checkmark {
+    background-color: rgb(255, 255, 255);
+    border-radius: 30px;
+    border-width: 0;
+    width: 30px;
+    height: 30px;
+    -unity-background-image-tint-color: rgba(0, 0, 0, 0);
+}
+
+/* 트랙: 켜짐 상태 → 핑크 pill */
+.setting-toggle:checked > .unity-toggle__input {
+    background-color: rgb(255, 138, 138);
+    justify-content: flex-end;
+}
+
+/* 노브: 켜짐 상태에서도 흰 원 유지 */
+.setting-toggle:checked > .unity-toggle__input > .unity-toggle__checkmark {
+    background-color: rgb(255, 255, 255);
+    -unity-background-image-tint-color: rgba(0, 0, 0, 0);
+}
+
+/* 닫기 버튼 */
+.close-button {
+    margin-top: 12px;
+    background-color: rgb(255, 138, 138);
+    color: rgb(255, 255, 255);
+    border-radius: 16px;
+    padding-top: 18px;
+    padding-bottom: 18px;
+    border-width: 0;
+    font-size: 22px;
+    -unity-font-style: bold;
+}
+
+.close-button:hover {
+    background-color: rgb(255, 110, 110);
+}
+
+.close-button:active {
+    background-color: rgb(230, 90, 90);
+}

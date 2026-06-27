@@ -1,0 +1,28 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="SettingsPanel.uss" />
+    <!-- 화면 전체를 덮는 반투명 어두운 배경 (HTML의 <div class="overlay">와 같음) -->
+    <!-- style="display: none" → 에디터 미리보기에서도 숨겨짐. Open()에서 Flex로 바꿔 표시 -->
+    <ui:VisualElement name="overlay" class="overlay" style="display: none;">
+
+        <!-- 가운데 떠있는 설정 카드 -->
+        <ui:VisualElement class="panel-card">
+
+            <ui:Label text="설정" class="title" />
+
+            <!-- 사운드 행 -->
+            <ui:VisualElement class="setting-row">
+                <ui:Label text="사운드" class="setting-label" />
+                <ui:Toggle name="sound-toggle" class="setting-toggle" />
+            </ui:VisualElement>
+
+            <!-- 진동 행 -->
+            <ui:VisualElement class="setting-row">
+                <ui:Label text="진동" class="setting-label" />
+                <ui:Toggle name="vibration-toggle" class="setting-toggle" />
+            </ui:VisualElement>
+
+            <ui:Button name="close-button" text="닫기" class="close-button" />
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
