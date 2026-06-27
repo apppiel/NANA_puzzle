@@ -1,6 +1,5 @@
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
+using UnityEngine.UIElements;
 using Firebase;
 using Firebase.Firestore;
 using Firebase.Extensions;
@@ -8,18 +7,28 @@ using System.Collections.Generic;
 
 public class RewardManager : MonoBehaviour
 {
-    [Header("UI 연결 (인스펙터에서 연결)")]
-    public GameObject rewardPanel;  // 코드 표시 패널 오브젝트
-    public TMP_Text codeText;       // 인증코드 텍스트
-    public TMP_Text statusText;     // 상태 메시지 텍스트 ("저장 중...", "발급 완료" 등)
-    public Button copyButton;       // 코드 복사 버튼
-    public GameManager gameManager; // 레벨 이동용. 인스펙터에서 연결
+    public GameManager gameManager;  // 레벨 이동용. 인스펙터에서 연결
+
+    VisualElement overlay;
+    Label codeLabel;
+    Label statusLabel;
+    string currentCode = "";  // CopyCode()에서 클립보드에 넣을 코드값 보관
 
     FirebaseFirestore db;
     bool firebaseReady = false;
 
     void Start()
     {
+        var root = GetComponent<UIDocument>().rootVisualElement;
+
+        overlay    = root.Q<VisualElement>("overlay");
+        codeLabel  = root.Q<Label>("code-text");
+        statusLabel = root.Q<Label>("status-text");
+
+        root.Q<Button>("copy-button").clicked    += CopyCode;
+        root.Q<Button>("keep-button").clicked    += OnKeepLevel;
+        root.Q<Button>("restart-button").clicked += OnRestartFromLevel1;
+
         // Firebase 초기화. 앱 실행 시 자동으로 한 번만 수행됨
         FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
         {
@@ -39,7 +48,7 @@ public class RewardManager : MonoBehaviour
     // 모든 레벨 클리어 시 GameManager에서 호출
     public void ShowReward()
     {
-        if (rewardPanel != null) rewardPanel.SetActive(true);
+        overlay.style.display = DisplayStyle.Flex;
 
         // 기기 고유 ID를 문서 키로 사용해 중복 발급 방지
         string deviceId = SystemInfo.deviceUniqueIdentifier;
@@ -88,26 +97,26 @@ public class RewardManager : MonoBehaviour
         });
     }
 
-    // "현재 레벨 유지" 버튼 OnClick에 연결 — 패널 닫고 마지막 레벨 재시작
+    // "현재 레벨 계속하기" 버튼
     public void OnKeepLevel()
     {
-        if (rewardPanel != null) rewardPanel.SetActive(false);
+        overlay.style.display = DisplayStyle.None;
         if (gameManager != null) gameManager.RestartLevel();
     }
 
-    // "1레벨로 돌아가기" 버튼 OnClick에 연결 — 패널 닫고 1레벨로 이동
+    // "1레벨로 돌아가기" 버튼
     public void OnRestartFromLevel1()
     {
-        if (rewardPanel != null) rewardPanel.SetActive(false);
+        overlay.style.display = DisplayStyle.None;
         if (gameManager != null) gameManager.GoToLevel1();
     }
 
-    // 복사 버튼 OnClick에 연결
+    // "코드 복사하기" 버튼
     public void CopyCode()
     {
-        if (codeText == null) return;
-        GUIUtility.systemCopyBuffer = codeText.text;
-        SetStatus("클립보드에 복사되었습니다!");
+        if (string.IsNullOrEmpty(currentCode)) return;
+        GUIUtility.systemCopyBuffer = currentCode;
+        SetStatus("클립보드에 복사되었습니다!", green: true);
     }
 
     // 예: A3K9-XZ21 형식. 헷갈리는 문자(0,O,1,I) 제외
@@ -124,11 +133,18 @@ public class RewardManager : MonoBehaviour
 
     void ShowCode(string code)
     {
-        if (codeText != null) codeText.text = code;
+        currentCode = code;
+        if (codeLabel != null) codeLabel.text = code;
     }
 
-    void SetStatus(string msg)
+    void SetStatus(string msg, bool green = false)
     {
-        if (statusText != null) statusText.text = msg;
+        if (statusLabel == null) return;
+        statusLabel.text = msg;
+        // green=true면 status-copied 클래스 추가(초록), 아니면 제거(기본 회색)
+        if (green)
+            statusLabel.AddToClassList("status-copied");
+        else
+            statusLabel.RemoveFromClassList("status-copied");
     }
 }

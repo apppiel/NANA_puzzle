@@ -1,0 +1,26 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="RewardPanel.uss" />
+    <!-- display: none → 에디터 미리보기에서도 숨김. ShowReward()에서 Flex로 전환 -->
+    <ui:VisualElement name="overlay" class="overlay" style="display: none;">
+
+        <ui:VisualElement class="panel-card">
+
+            <ui:Label text="🎉" class="emoji" />
+            <ui:Label text="모든 레벨 클리어!" class="title" />
+            <ui:Label text="인증코드를 복사해서 제출해 주세요" class="subtitle" />
+
+            <!-- 인증코드 강조 박스 -->
+            <ui:VisualElement class="code-box">
+                <ui:Label name="code-text" text="- - - - -" class="code-text" />
+            </ui:VisualElement>
+
+            <!-- Firebase 저장 상태 메시지 -->
+            <ui:Label name="status-text" text="" class="status-text" />
+
+            <ui:Button name="copy-button" text="코드 복사하기" class="btn btn-copy" />
+            <ui:Button name="keep-button" text="현재 레벨 계속하기" class="btn btn-primary" />
+            <ui:Button name="restart-button" text="1레벨로 돌아가기" class="btn btn-secondary" />
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
