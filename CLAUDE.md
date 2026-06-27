@@ -17,7 +17,8 @@
 - Assets/Scripts/Core  — 게임 로직 (BoardRenderer, GameManager, RewardManager)
 - Assets/Scripts/UI    — UI (LoadingScreen, SettingsPanel, SettingsManager)
 - Assets/Levels        — 레벨 데이터 에셋 (Level_1 등)
-- Assets/Art           — 스프라이트/프리팹 (Cell 프리팹)
+- Assets/Art           — 스프라이트/프리팹 (Cell 프리팹), GameTitle.png (로딩화면 이미지)
+- Assets/UI            — UI Toolkit 에셋 (SettingsPanel.uxml/uss, RewardPanel.uxml/uss, PanelSettings.asset)
 - Assets/Casual Game Sounds U6 — 효과음 에셋 (DM-CGS-01~50.wav)
 - Assets/Firebase      — Firebase SDK (FirebaseApp, Firestore)
 - Assets/ExternalDependencyManager — Firebase EDM4U
@@ -27,10 +28,18 @@
 - LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
 - BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
 - GameManager.cs: 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 레벨 번호 텍스트(LevelText) 표시. 마지막 레벨 클리어 시 RewardManager.ShowReward() 호출.
-- RewardManager.cs: 모든 레벨 클리어 시 랜덤 인증코드(예: A3K9-XZ21) 생성. Firebase Firestore에 기기 ID 키로 저장(중복 방지). RewardPanel UI에 코드 표시 및 복사 버튼 제공.
+- RewardManager.cs: 모든 레벨 클리어 시 랜덤 인증코드(예: A3K9-XZ21) 생성. Firebase Firestore에 기기 ID 키로 저장(중복 방지). UI Toolkit 기반 RewardPanel 제어. RewardUI GameObject에 UIDocument와 함께 부착.
 - AdManager.cs: 전면 광고 로드/표시 담당. N레벨마다 광고 표시 (기본 3레벨) + 막혀서 리셋 N번마다 광고 표시 (기본 4번). 인스펙터에서 횟수 조정 가능. useTestAd 체크 해제 시 실제 광고로 전환.
+- SettingsPanel.cs: UI Toolkit 기반 설정 패널 제어. SettingsUI GameObject에 UIDocument와 함께 부착. SettingsManager와 분리되어 있어 UI만 담당.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 - Assets/google-services.json: Firebase 프로젝트 설정 파일. 패키지명 com.nanaBox.NANApuzzle.
+
+## UI Toolkit 구조
+- SettingsUI (GameObject): UIDocument + SettingsPanel.cs. Assets/UI/SettingsPanel.uxml/uss 사용.
+- RewardUI (GameObject): UIDocument + RewardManager.cs. Assets/UI/RewardPanel.uxml/uss 사용.
+- PanelSettings: Assets/UI/PanelSettings.asset. Scale With Screen Size, 1080×1920, Match Height.
+- USS에서 폰트: `-unity-font: url("../TextMesh Pro/Fonts/NanumSquareRoundEB.ttf")` 로 연결.
+- UIDocument 오브젝트는 눈 아이콘(씬 뷰 숨김)으로 숨기면 런타임에 영향을 주므로 사용 금지. 대신 UXML에서 `style="display: none;"` 으로 초기 숨김 처리.
 
 ## 게임 규칙 / 데이터 모델
 - 칸 좌표는 Vector2Int (x=열, y=행), (0,0)은 왼쪽 아래.
@@ -66,6 +75,10 @@
 - [x] Google AdMob 전면 광고 연동 (SDK 11.2.0, 3레벨마다 표시, 실기기 테스트 완료)
 - [x] 막힘 리셋 N번마다 전면 광고 표시 (기본 4번, AdManager.showAdEveryNStucks로 조정)
 - [x] 레벨 73개 제작 완료 (Level_1 ~ Level_73)
+- [x] SettingsPanel UI Toolkit 전환 (UXML/USS, SettingsUI GameObject + UIDocument)
+- [x] RewardPanel UI Toolkit 전환 (UXML/USS, RewardUI GameObject + UIDocument)
+- [x] PanelSettings: Scale With Screen Size, 1080×1920 기준, Match Height(1) — 모바일 해상도 대응
+- [x] 로딩화면 이미지 GameTitle.png로 교체, Aspect Ratio Fitter(Envelope Parent)로 전체화면 대응
 
 ## 다음 할 일 (TODO)
 - [ ] Firestore 보안 규칙 수정 (출시 전 필수 — 현재 테스트 모드, 30일 후 차단됨)
@@ -123,3 +136,4 @@ LLM의 흔한 코딩 실수를 줄이기 위한 행동 지침. 프로젝트 지�
 - 원래부터 있던 죽은 코드는 요청 없이 건드리지 말 것.
 
 기준: 변경된 모든 줄이 사용자의 요청과 직접 연결되어야 함.
+
