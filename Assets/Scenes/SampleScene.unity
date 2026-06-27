@@ -316,7 +316,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   board: {fileID: 2104947463}
   levels:
-  - {fileID: 11400000, guid: 61e03fd58de3e46e58a00616c8421ce3, type: 2}
+  - {fileID: 11400000, guid: faf29fadad3904be28da7bc13f65a244, type: 2}
   levelText: {fileID: 1154489675}
   roundCountText: {fileID: 1561126345}
   rewardManager: {fileID: 1900200361}
