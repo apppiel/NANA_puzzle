@@ -163,7 +163,7 @@ public class BoardRenderer : MonoBehaviour
         GameObject outlineObj = new GameObject("Outline");
         outlineObj.transform.SetParent(obj.transform);
         outlineObj.transform.localPosition = new Vector3(0.04f, -0.04f, 0f);  // 오른쪽·아래로 오프셋 → 해당 방향만 테두리 노출
-        outlineObj.transform.localScale = Vector3.one * 1.05f;  // 8% 크게. 키우면 테두리 두꺼워짐
+        outlineObj.transform.localScale = Vector3.one * 1.05f;  // 5% 크게. 키우면 테두리 두꺼워짐
 
         SpriteRenderer outlineSr = outlineObj.AddComponent<SpriteRenderer>();
         outlineSr.sprite = cellSprite;
@@ -174,7 +174,7 @@ public class BoardRenderer : MonoBehaviour
         GameObject glowObj = new GameObject("Glow");
         glowObj.transform.SetParent(obj.transform);
         glowObj.transform.localPosition = Vector3.zero;
-        glowObj.transform.localScale = Vector3.one * 1.15f;  // 칸보다 45% 더 크게 → 바깥으로 삐져나옴
+        glowObj.transform.localScale = Vector3.one * 1.15f;  // 칸보다 15% 더 크게 → 바깥으로 삐져나옴
 
         SpriteRenderer glowSr = glowObj.AddComponent<SpriteRenderer>();
         glowSr.sprite = cellSprite;
@@ -397,6 +397,7 @@ public class BoardRenderer : MonoBehaviour
       movedInGesture = true;
       if (fillSound != null) audioSource.PlayOneShot(fillSound);
       StartCoroutine(AnimateCellPop(cells[target]));  // 칸이 추가될 때 팝 애니메이션
+      StartCoroutine(AnimateDebris(CellToWorld(target)));  // 부스러기 파티클
       Redraw();
       CheckWin();
       CheckStuck();  // 클리어가 아닌데 갈 곳이 없으면 자동 리셋
@@ -488,6 +489,62 @@ public class BoardRenderer : MonoBehaviour
   }
 
 
+  // ── 부스러기 파티클 ────────────────────────────────────────────
+  // 칸 채울 때 작은 원 조각들이 사방으로 튀어나가다 사라지는 효과
+  IEnumerator AnimateDebris(Vector3 center)
+  {
+    const int count = 6;          // 부스러기 개수
+    const float duration = 0.35f; // 전체 지속 시간(초)
+    const float range = 0.9f;     // 날아가는 최대 거리(유닛)
+
+    var srs = new SpriteRenderer[count];
+    var dirs = new Vector3[count];
+
+    for (int i = 0; i < count; i++)
+    {
+      // 360도를 균등 분할 + 소량 랜덤 오프셋 → 고르게 퍼지되 자연스러운 느낌
+      float angle = i * (360f / count) + Random.Range(-20f, 20f);
+      dirs[i] = new Vector3(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad), 0f);
+
+      GameObject obj = new GameObject("Debris");
+      obj.transform.SetParent(transform);
+      obj.transform.position = center;
+      float size = Random.Range(0.12f, 0.20f);  // 크기 랜덤화로 깊이감 추가
+      obj.transform.localScale = Vector3.one * size;
+
+      srs[i] = obj.AddComponent<SpriteRenderer>();
+      srs[i].sprite = circleSprite;
+      srs[i].color = lineColor;
+      srs[i].sortingOrder = 3;
+    }
+
+    float t = 0f;
+    while (t < duration)
+    {
+      t += Time.deltaTime;
+      float p = t / duration;
+      // EaseOut: 처음엔 빠르게 날아가다 천천히 멈추는 느낌
+      float dist = range * (1f - (1f - p) * (1f - p));
+      float alpha = 1f - p;
+
+      for (int i = 0; i < count; i++)
+      {
+        if (srs[i] == null) continue;
+        srs[i].transform.position = center + dirs[i] * dist;
+        Color c = lineColor;
+        c.a = alpha;
+        srs[i].color = c;
+      }
+      yield return null;
+    }
+
+    for (int i = 0; i < count; i++)
+    {
+      if (srs[i] != null) Destroy(srs[i].gameObject);
+    }
+  }
+
+
   // ── 클리어 판정 ─────────────────────────────────────────────────
 
   void CheckWin()
@@ -517,7 +574,7 @@ public class BoardRenderer : MonoBehaviour
       SpriteRenderer sr = kv.Value;
 
       if (won)
-        sr.color = winColor;                                          // 클리어 → 전부 초록
+        sr.color = winColor;                                          // 클리어 → 전부 라벤더
       else if (pathSet.Contains(c))
         sr.color = (c == level.startCell) ? startColor : filledColor; // 경로 칸 → 시작은 노랑, 나머지는 파랑
       else
