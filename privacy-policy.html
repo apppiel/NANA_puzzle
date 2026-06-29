@@ -5,50 +5,167 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>개인정보처리방침 — 나나퍼즐</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; max-width: 800px; margin: 0 auto; padding: 24px 16px; color: #222; line-height: 1.7; }
-    h1 { font-size: 1.4rem; border-bottom: 1px solid #ddd; padding-bottom: 12px; }
-    h2 { font-size: 1.1rem; margin-top: 32px; }
-    p, li { font-size: 0.95rem; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+      background: #fafafa;
+      color: #333;
+      line-height: 1.8;
+    }
+
+    header {
+      background: #ff8a8a;
+      padding: 40px 24px 32px;
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 1.6rem;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+
+    header p {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.85);
+    }
+
+    main {
+      max-width: 720px;
+      margin: 32px auto;
+      padding: 0 16px 64px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      color: #ff8a8a;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h2::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 1em;
+      background: #ff8a8a;
+      border-radius: 2px;
+    }
+
+    p, li {
+      font-size: 0.92rem;
+      color: #555;
+    }
+
+    ul {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+
+    li { margin-bottom: 6px; }
+
+    a {
+      color: #ff8a8a;
+      text-decoration: none;
+    }
+
+    a:hover { text-decoration: underline; }
+
+    .highlight {
+      background: #fff5f5;
+      border-left: 3px solid #ff8a8a;
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+      margin-top: 8px;
+      font-size: 0.92rem;
+      color: #555;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #aaa;
+      padding: 24px 16px;
+    }
   </style>
 </head>
 <body>
 
-<h1>개인정보처리방침</h1>
-<p>(주)나나박스(이하 "회사")는 <strong>NANA PUZZLE(나나퍼즐)</strong> 앱 서비스(이하 "서비스") 운영과 관련하여 이용자의 개인정보를 아래와 같이 처리합니다.</p>
+<header>
+  <h1>🧩 나나퍼즐</h1>
+  <p>개인정보처리방침 · Privacy Policy</p>
+</header>
 
-<h2>1. 수집하는 정보</h2>
-<p>서비스는 다음 정보를 수집합니다.</p>
-<ul>
-  <li><strong>기기 고유 식별자</strong> — 모든 레벨 클리어 시 인증코드를 1회만 발급하기 위해 사용됩니다. 이름, 연락처 등 개인을 특정할 수 있는 정보는 수집하지 않습니다.</li>
-  <li><strong>광고 식별자(Advertising ID)</strong> — Google AdMob을 통한 광고 제공 목적으로 수집됩니다.</li>
-</ul>
+<main>
 
-<h2>2. 수집 및 이용 목적</h2>
-<ul>
-  <li>인증코드 중복 발급 방지</li>
-  <li>맞춤형 광고 제공</li>
-</ul>
+  <div class="card">
+    <p>(주)나나박스(이하 "회사")는 <strong>NANA PUZZLE(나나퍼즐)</strong> 앱 서비스 운영과 관련하여 이용자의 개인정보를 아래와 같이 처리합니다.</p>
+  </div>
 
-<h2>3. 제3자 서비스</h2>
-<p>서비스는 아래 제3자 서비스를 이용합니다. 각 서비스의 개인정보처리방침을 함께 확인하시기 바랍니다.</p>
-<ul>
-  <li><strong>Google Firebase Firestore</strong> — 인증코드 저장 (<a href="https://firebase.google.com/support/privacy" target="_blank">Firebase 개인정보처리방침</a>)</li>
-  <li><strong>Google AdMob</strong> — 광고 제공 (<a href="https://policies.google.com/privacy" target="_blank">Google 개인정보처리방침</a>)</li>
-</ul>
+  <div class="card">
+    <h2>수집하는 정보</h2>
+    <ul>
+      <li><strong>기기 고유 식별자</strong> — 모든 레벨 클리어 시 인증코드를 1회만 발급하기 위해 사용됩니다. 이름, 연락처 등 개인을 특정할 수 있는 정보는 수집하지 않습니다.</li>
+      <li><strong>광고 식별자(Advertising ID)</strong> — Google AdMob을 통한 광고 제공 목적으로 수집됩니다.</li>
+    </ul>
+  </div>
 
-<h2>4. 보유 및 이용 기간</h2>
-<p>수집된 기기 고유 식별자는 서비스 운영 기간 동안 보유하며, 서비스 종료 시 파기합니다.</p>
+  <div class="card">
+    <h2>수집 및 이용 목적</h2>
+    <ul>
+      <li>인증코드 중복 발급 방지</li>
+      <li>맞춤형 광고 제공</li>
+    </ul>
+  </div>
 
-<h2>5. 이용자의 권리</h2>
-<p>이용자는 언제든지 개인정보 열람, 수정, 삭제를 요청할 수 있습니다. 아래 이메일로 문의해 주세요.</p>
+  <div class="card">
+    <h2>제3자 서비스</h2>
+    <p>서비스는 아래 제3자 서비스를 이용합니다.</p>
+    <ul style="margin-top: 12px;">
+      <li><strong>Google Firebase Firestore</strong> — 인증코드 저장<br>
+        <a href="https://firebase.google.com/support/privacy" target="_blank">Firebase 개인정보처리방침 →</a></li>
+      <li style="margin-top: 8px;"><strong>Google AdMob</strong> — 광고 제공<br>
+        <a href="https://policies.google.com/privacy" target="_blank">Google 개인정보처리방침 →</a></li>
+    </ul>
+  </div>
 
-<h2>6. 문의</h2>
-<p>개인정보 관련 문의: <strong>[이메일 주소]</strong></p>
+  <div class="card">
+    <h2>보유 및 이용 기간</h2>
+    <p>수집된 기기 고유 식별자는 서비스 운영 기간 동안 보유하며, 서비스 종료 시 파기합니다.</p>
+  </div>
 
-<h2>7. 방침 변경</h2>
-<p>본 방침은 법령 또는 서비스 변경에 따라 수정될 수 있으며, 변경 시 앱 내 공지 또는 이 페이지를 통해 안내합니다.</p>
+  <div class="card">
+    <h2>이용자의 권리</h2>
+    <p>이용자는 언제든지 개인정보 열람, 수정, 삭제를 요청할 수 있습니다.</p>
+  </div>
 
-<p style="margin-top: 48px; color: #888; font-size: 0.85rem;">시행일: 2026년 6월 29일 | (주)나나박스</p>
+  <div class="card">
+    <h2>문의</h2>
+    <div class="highlight">📧 <strong>[이메일 주소]</strong></div>
+  </div>
+
+  <div class="card">
+    <h2>방침 변경</h2>
+    <p>본 방침은 법령 또는 서비스 변경에 따라 수정될 수 있으며, 변경 시 앱 내 공지 또는 이 페이지를 통해 안내합니다.</p>
+  </div>
+
+</main>
+
+<footer>
+  시행일: 2026년 6월 29일 &nbsp;|&nbsp; (주)나나박스
+</footer>
 
 </body>
 </html>
