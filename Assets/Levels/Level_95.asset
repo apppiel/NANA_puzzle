@@ -10,18 +10,28 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5cffaa7257c7147a78795255a96092b1, type: 3}
-  m_Name: Level_73
+  m_Name: Level_95
   m_EditorClassIdentifier: 
-  width: 8
-  height: 8
-  startCell: {x: 7, y: 7}
+  width: 11
+  height: 11
+  startCell: {x: 9, y: 2}
   blockedCells:
-  - {x: 0, y: 1}
   - {x: 0, y: 4}
-  - {x: 1, y: 6}
-  - {x: 2, y: 0}
-  - {x: 3, y: 4}
-  - {x: 5, y: 7}
+  - {x: 0, y: 8}
+  - {x: 1, y: 2}
+  - {x: 1, y: 10}
+  - {x: 2, y: 5}
+  - {x: 3, y: 3}
+  - {x: 4, y: 0}
+  - {x: 4, y: 7}
+  - {x: 4, y: 10}
+  - {x: 5, y: 2}
   - {x: 6, y: 5}
-  - {x: 7, y: 0}
-  - {x: 7, y: 3}
+  - {x: 6, y: 9}
+  - {x: 7, y: 7}
+  - {x: 8, y: 2}
+  - {x: 9, y: 5}
+  - {x: 9, y: 8}
+  - {x: 10, y: 0}
+  - {x: 10, y: 3}
+  - {x: 10, y: 10}

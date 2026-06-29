@@ -74,15 +74,14 @@
 - [x] RewardPanel UI (코드 표시 + 복사 버튼)
 - [x] Google AdMob 전면 광고 연동 (SDK 11.2.0, 3레벨마다 표시, 실기기 테스트 완료)
 - [x] 막힘 리셋 N번마다 전면 광고 표시 (기본 4번, AdManager.showAdEveryNStucks로 조정)
-- [x] 레벨 73개 제작 완료 (Level_1 ~ Level_73)
+- [x] 레벨 100개 제작 완료 (Level_1 ~ Level_100)
 - [x] SettingsPanel UI Toolkit 전환 (UXML/USS, SettingsUI GameObject + UIDocument)
 - [x] RewardPanel UI Toolkit 전환 (UXML/USS, RewardUI GameObject + UIDocument)
 - [x] PanelSettings: Scale With Screen Size, 1080×1920 기준, Match Height(1) — 모바일 해상도 대응
 - [x] 로딩화면 이미지 GameTitle.png로 교체, Aspect Ratio Fitter(Envelope Parent)로 전체화면 대응
 
 ## 다음 할 일 (TODO)
-- [ ] Firestore 보안 규칙 수정 (출시 전 필수 — 현재 테스트 모드, 30일 후 차단됨)
-  - Firebase 콘솔 → Firestore → 규칙 탭에서 rewards 컬렉션 쓰기 최초 1회만 허용으로 변경
+- [x] Firestore 보안 규칙 수정 — rewards 컬렉션 get/create만 허용 (update·delete·list 차단)
 - [ ] 출시 전 AdManager의 useTestAd 체크 해제 (실제 광고로 전환)
 - [ ] (나중에) 절차적 레벨 생성 검토
 
