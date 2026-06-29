@@ -20,10 +20,49 @@ public class GameManager : MonoBehaviour
     Application.targetFrameRate = 60;  // 목표 프레임을 60으로 고정. 30으로 낮추면 배터리 소모 줄어듦
     QualitySettings.vSyncCount = 0;    // vSync를 끄지 않으면 targetFrameRate가 무시되고 화면 주사율에 묶임
 
+    ClearPrefsIfReinstalled();
+
     // PlayerPrefs는 앱이 꺼져도 유지되는 단순 저장소 (에디터에서도 유지됨)
     int saved = PlayerPrefs.GetInt(ProgressKey, 0);   // 저장된 레벨 (없으면 0)
     LoadLevel(saved);
   }
+
+  // Android 재설치 감지: firstInstallTime이 달라지면 새로 설치된 것 → PlayerPrefs 초기화
+  // Google 자동 백업이 PlayerPrefs를 복원해도 firstInstallTime은 새 값이므로 올바르게 감지됨
+  void ClearPrefsIfReinstalled()
+  {
+#if UNITY_ANDROID && !UNITY_EDITOR
+    long currentInstallTime = GetFirstInstallTime();
+    long storedInstallTime  = long.Parse(PlayerPrefs.GetString("installTime", "0"));
+
+    if (currentInstallTime != storedInstallTime)
+    {
+      PlayerPrefs.DeleteAll();
+      PlayerPrefs.SetString("installTime", currentInstallTime.ToString());
+      PlayerPrefs.Save();
+    }
+#endif
+  }
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+  long GetFirstInstallTime()
+  {
+    try
+    {
+      using var player  = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
+      using var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
+      using var pm       = activity.Call<AndroidJavaObject>("getPackageManager");
+      string    pkg      = activity.Call<string>("getPackageName");
+      using var info     = pm.Call<AndroidJavaObject>("getPackageInfo", pkg, 0);
+      return info.Get<long>("firstInstallTime");
+    }
+    catch (System.Exception e)
+    {
+      Debug.LogWarning("firstInstallTime 조회 실패: " + e.Message);
+      return 0L;
+    }
+  }
+#endif
 
   void LoadLevel(int index)
   {
