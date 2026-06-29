@@ -45,7 +45,6 @@
 - 칸 좌표는 Vector2Int (x=열, y=행), (0,0)은 왼쪽 아래.
 - 시작 칸에서 출발, 상하좌우 인접 칸만 이동, 이미 채운 칸 재방문 불가, 막힌 칸 이동 불가.
 - 채운 칸 리스트(path) 길이가 전체 칸 수와 같으면 클리어.
-- 시작 칸을 다시 누르면 초기화.
 
 ## 진행 상황 (완료)
 - [x] 폴더 구조, Git 초기화 및 첫 커밋
@@ -81,6 +80,8 @@
 - [x] 로딩화면 이미지 GameTitle.png로 교체, Aspect Ratio Fitter(Envelope Parent)로 전체화면 대응
 - [x] Firestore 보안 규칙 수정 — rewards 컬렉션 get/create만 허용 (update·delete·list 차단)
 - [x] 개인정보처리방침 페이지 제작 — GitHub Pages 배포 (https://apppiel.github.io/NANA_puzzle/privacy-policy.html)
+- [x] 설정창 "처음부터 시작" 버튼 추가 (진행 상황 초기화 + 1레벨로 이동)
+- [x] 시작 칸 탭 시 경로 초기화 기능 제거
 
 ## 다음 할 일 (TODO)
 - [ ] 출시 전 AdManager의 useTestAd 체크 해제 (실제 광고로 전환) — 최종 빌드 직전
