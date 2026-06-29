@@ -79,10 +79,13 @@
 - [x] RewardPanel UI Toolkit 전환 (UXML/USS, RewardUI GameObject + UIDocument)
 - [x] PanelSettings: Scale With Screen Size, 1080×1920 기준, Match Height(1) — 모바일 해상도 대응
 - [x] 로딩화면 이미지 GameTitle.png로 교체, Aspect Ratio Fitter(Envelope Parent)로 전체화면 대응
+- [x] Firestore 보안 규칙 수정 — rewards 컬렉션 get/create만 허용 (update·delete·list 차단)
+- [x] 개인정보처리방침 페이지 제작 — GitHub Pages 배포 (https://apppiel.github.io/NANA_puzzle/privacy-policy.html)
 
 ## 다음 할 일 (TODO)
-- [x] Firestore 보안 규칙 수정 — rewards 컬렉션 get/create만 허용 (update·delete·list 차단)
-- [ ] 출시 전 AdManager의 useTestAd 체크 해제 (실제 광고로 전환)
+- [ ] 출시 전 AdManager의 useTestAd 체크 해제 (실제 광고로 전환) — 최종 빌드 직전
+- [ ] Play Console 스토어 리스팅 (앱 설명, 스크린샷) — 개발자 등록 완료 후
+- [ ] Play Console 데이터 보안 섹션 작성 (AdMob·Firebase 수집 데이터 신고)
 - [ ] (나중에) 절차적 레벨 생성 검토
 
 ## 협업 방식 메모
