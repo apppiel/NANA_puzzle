@@ -82,6 +82,7 @@
 - [x] 개인정보처리방침 페이지 제작 — GitHub Pages 배포 (https://apppiel.github.io/NANA_puzzle/privacy-policy.html)
 - [x] 설정창 "처음부터 시작" 버튼 추가 (진행 상황 초기화 + 1레벨로 이동)
 - [x] 시작 칸 탭 시 경로 초기화 기능 제거
+- [x] 재설치 시 진행 상황 초기화 — firstInstallTime 비교로 Google 자동 백업 복원 문제 해결
 
 ## 다음 할 일 (TODO)
 - [ ] 출시 전 AdManager의 useTestAd 체크 해제 (실제 광고로 전환) — 최종 빌드 직전
