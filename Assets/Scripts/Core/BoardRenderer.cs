@@ -323,20 +323,7 @@ public class BoardRenderer : MonoBehaviour
 
       movedInGesture = false;  // 새 제스처 시작 시 초기화
 
-      if (c == level.startCell)
-      {
-        // 시작 칸 → 경로 초기화 후 처음부터 다시 그리기
-        armed = false;
-        isDrawing = true;
-        path.Clear();
-        pathSet.Clear();
-        path.Add(level.startCell);
-        pathSet.Add(level.startCell);
-        dotAnimated = false;
-        ResetStartDot();  // 흰 원 원래 상태로 복원
-        Redraw();
-      }
-      else if (armed)
+      if (armed)
       {
         // armed 상태에서 두 번째 탭 → 즉시 그리기 시작
         armed = false;

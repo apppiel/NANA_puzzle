@@ -22,6 +22,7 @@
             </ui:VisualElement>
 
             <ui:Button name="close-button" text="닫기" class="close-button" />
+            <ui:Button name="reset-button" text="처음부터 시작" class="reset-button" />
 
         </ui:VisualElement>
     </ui:VisualElement>

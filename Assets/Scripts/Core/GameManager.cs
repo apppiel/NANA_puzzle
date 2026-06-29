@@ -77,6 +77,15 @@ public class GameManager : MonoBehaviour
   // UI Button의 OnClick에서 호출
   public void RestartLevel() { LoadLevel(currentIndex); }
   public void GoToLevel1() { LoadLevel(0); }
+
+  // 설정창 "처음부터 시작" → 저장된 진행 상황을 지우고 1레벨로 이동
+  public void ResetAndRestart()
+  {
+    PlayerPrefs.DeleteKey(ProgressKey);
+    PlayerPrefs.Save();
+    LoadLevel(0);
+  }
+
   public void NextLevel()
   {
     int next = currentIndex + 1;

@@ -5,6 +5,8 @@ using UnityEngine.UIElements;
 // UIDocument 컴포넌트가 같은 오브젝트에 있어야 동작함
 public class SettingsPanel : MonoBehaviour
 {
+  public GameManager gameManager;  // 진행 초기화용. 인스펙터에서 GameManager 오브젝트 연결
+
   VisualElement overlay;
   Toggle soundToggle;
   Toggle vibrationToggle;
@@ -28,6 +30,7 @@ public class SettingsPanel : MonoBehaviour
     soundToggle.RegisterValueChangedCallback(evt => SettingsManager.Instance.SetSound(evt.newValue));
     vibrationToggle.RegisterValueChangedCallback(evt => SettingsManager.Instance.SetVibration(evt.newValue));
     closeButton.clicked += Close;
+    root.Q<Button>("reset-button").clicked += ResetProgress;
 
     overlay.style.display = DisplayStyle.None;  // 시작 시 닫혀 있음
   }
@@ -43,4 +46,10 @@ public class SettingsPanel : MonoBehaviour
 
   // 닫기 버튼의 OnClick에 연결 (기존과 동일하게 public 유지)
   public void Close() => overlay.style.display = DisplayStyle.None;
+
+  void ResetProgress()
+  {
+    Close();
+    if (gameManager != null) gameManager.ResetAndRestart();
+  }
 }
