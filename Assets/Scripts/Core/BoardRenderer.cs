@@ -39,13 +39,15 @@ public class BoardRenderer : MonoBehaviour
   Sprite cellSprite;      // 모든 칸이 공유하는 둥근 사각형 그림. Awake에서 한 번만 생성
   Material lineMaterial;  // 경로 선용 머티리얼. new Material()은 자동 해제가 안 되므로 Awake에서 한 번만 생성
   float offsetX, offsetY;  // 격자를 화면 중앙에 맞추기 위한 이동값 (ShowLevel에서 계산)
-  readonly Color lineColor = new Color(1f, 0.541f, 0.541f);  // 선·닷 공통 색상 (#ff8a8a)
+  readonly Color lineColor = new Color(1f, 0.549f, 0.549f);  // 선·닷 공통 색상 (#ff8c8c)
   readonly WaitForSeconds waitStuck = new WaitForSeconds(0.6f);  // 캐싱: 매번 new 하면 GC 부담
   static readonly Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
   SpriteRenderer startDot;    // 시작점 중앙 흰 원 표시
   Sprite circleSprite;        // 원형 스프라이트 (시작/끝 닷 전용)
   bool dotAnimated = false;   // 시작 닷 팽창 애니메이션이 이미 실행됐는지
   SpriteRenderer endDot;      // 클리어 시 마지막 칸 중앙 흰 원
+  SpriteRenderer headArrow;   // 이동 중 경로 끝에 표시되는 방향 화살표 스프라이트
+  Sprite arrowSprite;         // 오른쪽 방향 꺾쇠(>) 스프라이트. 회전시켜 4방향 표현
   int fillableCount;     // 채워야 할 칸의 총 수. path.Count가 이 값과 같아지면 클리어
   bool isDrawing = false;      // 현재 손가락을 누르고 있는 중인지 여부
   bool armed = false;          // 마지막 칸 탭 후 이어그리기 대기 중
@@ -76,6 +78,7 @@ public class BoardRenderer : MonoBehaviour
     // 스프라이트를 여기서 만들어야, 곧바로 호출될 수 있는 ShowLevel() 안에서 안전하게 사용 가능
     cellSprite = MakeRoundedSprite(256, 64);
     circleSprite = MakeCircleSprite(128);
+    arrowSprite = MakeArrowSprite(64);
     lineMaterial = new Material(Shader.Find("Sprites/Default"));  // 레벨이 바뀌어도 재사용
     audioSource = gameObject.AddComponent<AudioSource>();
     audioSource.playOnAwake = false;
@@ -108,6 +111,7 @@ public class BoardRenderer : MonoBehaviour
     CreateLine();   // 경로 선 오브젝트 생성
     dotAnimated = false;
     CreateStartDot();  // 시작점 흰 원 생성
+    CreateHeadArrow(); // 방향 화살표 생성
 
     // DrawBoard() 다음에 세야 막힌 칸이 제외된 실제 칸 수를 얻을 수 있음
     fillableCount = cells.Count;
@@ -138,6 +142,7 @@ public class BoardRenderer : MonoBehaviour
     pathSet.Clear();
     startDot = null;
     endDot = null;  // Destroy로 제거됐으므로 참조도 비움
+    headArrow = null;
   }
 
   void DrawBoard()
@@ -229,6 +234,44 @@ public class BoardRenderer : MonoBehaviour
     startDot.color = Color.white;
   }
 
+  void CreateHeadArrow()
+  {
+    GameObject obj = new GameObject("HeadArrow");
+    obj.transform.SetParent(transform);
+    obj.transform.localScale = Vector3.one * 0.5f;  // 칸 크기(1유닛)의 50%
+    obj.SetActive(false);  // 첫 이동 전까지 숨김
+
+    headArrow = obj.AddComponent<SpriteRenderer>();
+    headArrow.sprite = arrowSprite;
+    headArrow.color = lineColor;
+    headArrow.sortingOrder = 3;  // 선(1), 닷(2) 위에 그려짐
+  }
+
+  // 경로 마지막 두 칸의 delta로 방향을 판단해 스프라이트를 회전시키고 위치를 갱신
+  void UpdateHeadArrow()
+  {
+    if (headArrow == null) return;
+
+    if (won || path.Count < 2)
+    {
+      headArrow.gameObject.SetActive(false);
+      return;
+    }
+
+    headArrow.gameObject.SetActive(true);
+
+    Vector2Int delta = path[^1] - path[^2];
+
+    // 스프라이트가 오른쪽(>)을 기본으로 생성됐으므로 회전으로 4방향 표현
+    float angle = 0f;
+    if (delta == Vector2Int.up)        angle = 90f;
+    else if (delta == Vector2Int.left) angle = 180f;
+    else if (delta == Vector2Int.down) angle = 270f;
+
+    headArrow.transform.position = CellToWorld(path[^1]);
+    headArrow.transform.rotation = Quaternion.Euler(0f, 0f, angle);
+  }
+
   // 첫 이동 시 원이 흰색 → 선 색으로 채워지고 그대로 유지
   IEnumerator AnimateStartDot()
   {
@@ -304,6 +347,43 @@ public class BoardRenderer : MonoBehaviour
 
     tex.Apply();
     return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+  }
+
+  // 오른쪽(>)을 향하는 꺾쇠 스프라이트. 회전시켜 4방향에 사용
+  Sprite MakeArrowSprite(int size)
+  {
+    Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+    tex.wrapMode = TextureWrapMode.Clamp;
+    tex.filterMode = FilterMode.Bilinear;
+
+    float h = size * 0.5f;
+    float thick = size * 0.18f;                            // 선 두께(픽셀). 크게 하면 굵어짐
+    Vector2 tip     = new Vector2(size * 0.75f, h);        // 오른쪽 꼭짓점
+    Vector2 topLeft = new Vector2(size * 0.25f, size * 0.82f); // 위쪽 끝
+    Vector2 botLeft = new Vector2(size * 0.25f, size * 0.18f); // 아래쪽 끝
+
+    for (int py = 0; py < size; py++)
+    {
+      for (int px = 0; px < size; px++)
+      {
+        Vector2 p = new Vector2(px + 0.5f, py + 0.5f);
+        float d = Mathf.Min(DistSeg(p, topLeft, tip), DistSeg(p, botLeft, tip));
+        // 선 중심에서 멀어질수록 0으로 페이드 (1픽셀 AA)
+        float alpha = Mathf.Clamp01(thick * 0.5f - d + 0.5f);
+        tex.SetPixel(px, py, new Color(1f, 1f, 1f, alpha));
+      }
+    }
+
+    tex.Apply();
+    return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+  }
+
+  // 점 p에서 선분 a-b까지의 최단 거리
+  float DistSeg(Vector2 p, Vector2 a, Vector2 b)
+  {
+    Vector2 ab = b - a, ap = p - a;
+    float t = Mathf.Clamp01(Vector2.Dot(ap, ab) / Vector2.Dot(ab, ab));
+    return Vector2.Distance(p, a + t * ab);
   }
 
 
@@ -573,6 +653,8 @@ public class BoardRenderer : MonoBehaviour
     line.positionCount = path.Count;
     for (int i = 0; i < path.Count; i++)
       line.SetPosition(i, CellToWorld(path[i]));
+
+    UpdateHeadArrow();
   }
 
 

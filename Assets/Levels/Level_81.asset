@@ -14,16 +14,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   width: 9
   height: 9
-  startCell: {x: 8, y: 2}
+  startCell: {x: 3, y: 7}
   blockedCells:
   - {x: 0, y: 0}
-  - {x: 0, y: 4}
   - {x: 0, y: 8}
+  - {x: 1, y: 2}
   - {x: 1, y: 6}
-  - {x: 2, y: 2}
   - {x: 3, y: 5}
-  - {x: 4, y: 0}
-  - {x: 5, y: 7}
-  - {x: 6, y: 3}
-  - {x: 7, y: 6}
-  - {x: 8, y: 8}
+  - {x: 3, y: 8}
+  - {x: 5, y: 0}
+  - {x: 6, y: 2}
+  - {x: 7, y: 7}
+  - {x: 8, y: 0}
+  - {x: 8, y: 3}
