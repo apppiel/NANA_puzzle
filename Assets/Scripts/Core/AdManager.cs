@@ -4,8 +4,13 @@ using GoogleMobileAds.Api;
 public class AdManager : MonoBehaviour
 {
   // 실제 광고 ID. 테스트 중에는 아래 testAdUnitId를 사용하고, 출시 전에 실제 ID로 교체할 것
-  const string realAdUnitId = "ca-app-pub-9369137176760502/6516467144";
-  const string testAdUnitId = "ca-app-pub-3940256099942544/1033173712"; // 구글 공식 테스트 ID
+#if UNITY_IOS
+  const string realAdUnitId = "ca-app-pub-3079888946602647/7627888748";
+  const string testAdUnitId = "ca-app-pub-3940256099942544/4411468910"; // iOS 구글 공식 테스트 ID
+#else
+  const string realAdUnitId = "ca-app-pub-3079888946602647/7294635262";
+  const string testAdUnitId = "ca-app-pub-3940256099942544/1033173712"; // Android 구글 공식 테스트 ID
+#endif
 
   // 에디터/테스트 빌드에서는 테스트 광고를 사용. 출시 빌드로 바꿀 때 false로 변경
   [SerializeField] bool useTestAd = true;
