@@ -1,5 +1,8 @@
 using UnityEngine;
 using GoogleMobileAds.Api;
+#if UNITY_IOS
+using UnityEngine.iOS;
+#endif
 
 public class AdManager : MonoBehaviour
 {
@@ -27,8 +30,16 @@ public class AdManager : MonoBehaviour
 
   void Start()
   {
+#if UNITY_IOS
+    // iOS: Apple 정책상 ATT 권한 팝업을 먼저 띄운 뒤 AdMob 초기화
+    ATTrackingManager.RequestTrackingAuthorization(status =>
+    {
+      MobileAds.Initialize(_ => LoadAd());
+    });
+#else
     // MobileAds.Initialize는 앱 전체에서 딱 한 번만 호출하면 됨
     MobileAds.Initialize(_ => LoadAd());
+#endif
   }
 
   void LoadAd()
