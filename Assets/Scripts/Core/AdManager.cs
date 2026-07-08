@@ -1,11 +1,27 @@
 using UnityEngine;
 using GoogleMobileAds.Api;
 #if UNITY_IOS
-using UnityEngine.iOS;
+using System.Runtime.InteropServices;
+using AOT;
 #endif
 
 public class AdManager : MonoBehaviour
 {
+#if UNITY_IOS
+  // iOS 네이티브 ATT 권한 요청 함수 (ATTBridge.mm)
+  delegate void ATTCallback(int status);
+
+  [DllImport("__Internal")]
+  static extern void _RequestATTPermission(ATTCallback callback);
+
+  static AdManager instance;
+
+  [MonoPInvokeCallback(typeof(ATTCallback))]
+  static void OnATTComplete(int status)
+  {
+    MobileAds.Initialize(_ => instance.LoadAd());
+  }
+#endif
   // 실제 광고 ID. 테스트 중에는 아래 testAdUnitId를 사용하고, 출시 전에 실제 ID로 교체할 것
 #if UNITY_IOS
   const string realAdUnitId = "ca-app-pub-3079888946602647/7627888748";
@@ -31,11 +47,9 @@ public class AdManager : MonoBehaviour
   void Start()
   {
 #if UNITY_IOS
+    instance = this;
     // iOS: Apple 정책상 ATT 권한 팝업을 먼저 띄운 뒤 AdMob 초기화
-    ATTrackingManager.RequestTrackingAuthorization(status =>
-    {
-      MobileAds.Initialize(_ => LoadAd());
-    });
+    _RequestATTPermission(OnATTComplete);
 #else
     // MobileAds.Initialize는 앱 전체에서 딱 한 번만 호출하면 됨
     MobileAds.Initialize(_ => LoadAd());
