@@ -7,6 +7,7 @@ public class SettingsPanel : MonoBehaviour
 {
   public GameManager gameManager;  // 진행 초기화용. 인스펙터에서 GameManager 오브젝트 연결
 
+  VisualElement root;
   VisualElement overlay;
   Toggle soundToggle;
   Toggle vibrationToggle;
@@ -14,7 +15,7 @@ public class SettingsPanel : MonoBehaviour
   void Start()
   {
     // UIDocument → rootVisualElement는 HTML의 <body>와 같음
-    var root = GetComponent<UIDocument>().rootVisualElement;
+    root = GetComponent<UIDocument>().rootVisualElement;
 
     // Q<T>("이름") = document.getElementById("이름")과 같음
     overlay = root.Q<VisualElement>("overlay");
@@ -33,6 +34,9 @@ public class SettingsPanel : MonoBehaviour
     root.Q<Button>("reset-button").clicked += ResetProgress;
 
     overlay.style.display = DisplayStyle.None;  // 시작 시 닫혀 있음
+    // 닫힌 상태에서 rootVisualElement가 풀스크린 터치를 가로채지 않도록 Ignore 처리
+    // (iOS에서 overlay가 display:none이어도 root가 Canvas 버튼 터치를 막는 문제 방지)
+    root.pickingMode = PickingMode.Ignore;
   }
 
   // ⚙️ 버튼의 OnClick에 연결 (기존과 동일하게 public 유지)
@@ -41,11 +45,16 @@ public class SettingsPanel : MonoBehaviour
     // 열 때마다 현재 설정 값으로 동기화
     soundToggle.value = SettingsManager.Instance.SoundOn;
     vibrationToggle.value = SettingsManager.Instance.VibrationOn;
+    root.pickingMode = PickingMode.Position;  // 패널 내부 버튼이 터치를 받을 수 있도록 복구
     overlay.style.display = DisplayStyle.Flex;
   }
 
   // 닫기 버튼의 OnClick에 연결 (기존과 동일하게 public 유지)
-  public void Close() => overlay.style.display = DisplayStyle.None;
+  public void Close()
+  {
+    overlay.style.display = DisplayStyle.None;
+    root.pickingMode = PickingMode.Ignore;  // 닫으면 다시 터치 차단 해제
+  }
 
   void ResetProgress()
   {

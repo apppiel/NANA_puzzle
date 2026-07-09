@@ -9,6 +9,7 @@ public class RewardManager : MonoBehaviour
 {
     public GameManager gameManager;  // 레벨 이동용. 인스펙터에서 연결
 
+    VisualElement root;
     VisualElement overlay;
     Label codeLabel;
     Label statusLabel;
@@ -19,7 +20,8 @@ public class RewardManager : MonoBehaviour
 
     void Start()
     {
-        var root = GetComponent<UIDocument>().rootVisualElement;
+        root = GetComponent<UIDocument>().rootVisualElement;
+        root.pickingMode = PickingMode.Ignore;  // 패널 닫힌 동안 터치 차단 방지
 
         overlay    = root.Q<VisualElement>("overlay");
         codeLabel  = root.Q<Label>("code-text");
@@ -48,6 +50,7 @@ public class RewardManager : MonoBehaviour
     // 모든 레벨 클리어 시 GameManager에서 호출
     public void ShowReward()
     {
+        root.pickingMode = PickingMode.Position;
         overlay.style.display = DisplayStyle.Flex;
 
         // 기기 고유 ID를 문서 키로 사용해 중복 발급 방지
@@ -101,6 +104,7 @@ public class RewardManager : MonoBehaviour
     public void OnKeepLevel()
     {
         overlay.style.display = DisplayStyle.None;
+        root.pickingMode = PickingMode.Ignore;
         if (gameManager != null) gameManager.RestartLevel();
     }
 
@@ -108,6 +112,7 @@ public class RewardManager : MonoBehaviour
     public void OnRestartFromLevel1()
     {
         overlay.style.display = DisplayStyle.None;
+        root.pickingMode = PickingMode.Ignore;
         if (gameManager != null) gameManager.GoToLevel1();
     }
 

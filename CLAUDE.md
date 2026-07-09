@@ -8,7 +8,7 @@
 ## 개발 환경
 - Unity 6000.0.77f1 LTS, Universal 2D 템플릿
 - Active Input Handling: Both (고전 Input 사용, 터치를 마우스 클릭으로 인식)
-- 타깃: Android, 세로(Portrait)
+- 타깃: Android + iOS, 세로(Portrait)
 - 버전 관리: Git / GitHub
 - 에디터: VS Code + Claude Code
 
@@ -83,12 +83,20 @@
 - [x] 설정창 "처음부터 시작" 버튼 추가 (진행 상황 초기화 + 1레벨로 이동)
 - [x] 시작 칸 탭 시 경로 초기화 기능 제거
 - [x] 재설치 시 진행 상황 초기화 — firstInstallTime 비교로 Google 자동 백업 복원 문제 해결
+- [x] iOS ATT(App Tracking Transparency) 구현 — ATTBridge.mm(네이티브 플러그인), iOSPostBuild.cs(프레임워크 자동 링크 + Info.plist 문구 추가)
+- [x] iOS App Store 심사 제출 (v1.0 build 1)
+- [x] iOS App Store 출시 완료 (v1.0)
+- [x] AdMob 앱 등록 (iOS 출시 후 광고 미노출 → 등록으로 해결)
+- [x] app-ads.txt 개발자 도메인(nanabox.co.kr)에 배포 — Google 크롤링 대기 중
+- [x] iOS UIDocument pickingMode 버그 수정 — 설정창 버튼 터치 불가 문제 (SettingsPanel, RewardManager)
 
 ## 다음 할 일 (TODO)
-- [ ] 출시 전 AdManager의 useTestAd 체크 해제 (실제 광고로 전환) — 최종 빌드 직전
-- [ ] Play Console 스토어 리스팅 (앱 설명, 스크린샷) — 개발자 등록 완료 후
-- [ ] Play Console 데이터 보안 섹션 작성 (AdMob·Firebase 수집 데이터 신고)
-- [ ] (나중에) 절차적 레벨 생성 검토
+- [ ] app-ads.txt 크롤링 완료 확인 (AdMob 콘솔 "업데이트 확인") — 최대 24~48시간 소요
+- [ ] Android Play Store 심사 제출
+- [x] Play Console 계정 세부정보 — 사업자등록번호·전자상거래 라이선스 입력
+- [x] Play Console 스토어 리스팅 (앱 설명, 스크린샷)
+- [x] Play Console 데이터 보안 섹션 작성 (AdMob·Firebase 수집 데이터 신고)
+- [x] (나중에) 절차적 레벨 생성 검토
 
 ## 협업 방식 메모
 - 사용자는 Unity 입문자. 한국어로 단계별로 자세히 안내할 것.
