@@ -4,6 +4,7 @@ using Firebase;
 using Firebase.Firestore;
 using Firebase.Extensions;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 public class RewardManager : MonoBehaviour
 {
@@ -89,7 +90,19 @@ public class RewardManager : MonoBehaviour
                     { "createdAt", FieldValue.ServerTimestamp }
                 };
 
-                db.Collection("rewards").Document(deviceId).SetAsync(data).ContinueWithOnMainThread(saveTask =>
+                // rewards: 중복 발급 방지용(기기ID 키)
+                // code_index: 웹에서 코드 검증용(코드 키). 웹은 존재 여부만 확인하지만
+                //   나중 CS 대응 위해 deviceId·createdAt 함께 저장
+                var indexData = new Dictionary<string, object>
+                {
+                    { "deviceId",  deviceId },
+                    { "createdAt", FieldValue.ServerTimestamp }
+                };
+
+                var rewardsTask = db.Collection("rewards").Document(deviceId).SetAsync(data);
+                var indexTask   = db.Collection("code_index").Document(newCode).SetAsync(indexData);
+
+                Task.WhenAll(rewardsTask, indexTask).ContinueWithOnMainThread(saveTask =>
                 {
                     if (saveTask.IsCompletedSuccessfully)
                         SetStatus("코드가 발급되었습니다!");
