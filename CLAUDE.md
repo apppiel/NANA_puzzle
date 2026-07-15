@@ -89,14 +89,22 @@
 - [x] AdMob 앱 등록 (iOS 출시 후 광고 미노출 → 등록으로 해결)
 - [x] app-ads.txt 개발자 도메인(nanabox.co.kr)에 배포 — Google 크롤링 대기 중
 - [x] iOS UIDocument pickingMode 버그 수정 — 설정창 버튼 터치 불가 문제 (SettingsPanel, RewardManager)
-
-## 다음 할 일 (TODO)
-- [ ] app-ads.txt 크롤링 완료 확인 (AdMob 콘솔 "업데이트 확인") — 최대 24~48시간 소요
-- [ ] Android Play Store 심사 제출
+- [x] iOS v1.0.1 업데이트 배포 (UIDocument 터치 버그 수정 포함)
+- [x] Android Play Store 심사 제출 (v1.0 build 1)
 - [x] Play Console 계정 세부정보 — 사업자등록번호·전자상거래 라이선스 입력
 - [x] Play Console 스토어 리스팅 (앱 설명, 스크린샷)
 - [x] Play Console 데이터 보안 섹션 작성 (AdMob·Firebase 수집 데이터 신고)
-- [x] (나중에) 절차적 레벨 생성 검토
+- [x] Firestore 보안 규칙 확장 — code_index, claims 컬렉션 추가 (get/create만 허용)
+- [x] 웹 경품 신청 페이지 제작 (Cafe24/reward-claim.html) — 코드 검증 + 배송 주소 제출
+- [x] RewardManager: code_index/{코드}에 동시 저장 로직 추가 — 웹 검증용 (deviceId, createdAt 필드 포함)
+- [x] 기존 발급 코드 2건 code_index/에 수동 백필 (Firebase 콘솔)
+
+## 다음 할 일 (TODO)
+- [ ] Android v1.0 심사 결과 대기 (Google Play)
+- [ ] Android v1.0.1 빌드 & 배포 — code_index 저장 로직 반영 (v1.0 심사 통과 후)
+- [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 반영
+- [ ] app-ads.txt 크롤링 완료 확인 (AdMob 콘솔 "업데이트 확인") — 최대 24~48시간 소요
+- [ ] (나중에) 절차적 레벨 생성 검토
 
 ## 협업 방식 메모
 - 사용자는 Unity 입문자. 한국어로 단계별로 자세히 안내할 것.
