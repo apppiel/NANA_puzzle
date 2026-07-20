@@ -46,12 +46,13 @@ public class AdManager : MonoBehaviour
 
   void Start()
   {
-#if UNITY_IOS
+#if UNITY_IOS && !UNITY_EDITOR
     instance = this;
     // iOS: Apple 정책상 ATT 권한 팝업을 먼저 띄운 뒤 AdMob 초기화
     _RequestATTPermission(OnATTComplete);
 #else
     // MobileAds.Initialize는 앱 전체에서 딱 한 번만 호출하면 됨
+    // (에디터에서는 iOS 빌드 타깃이어도 이 브랜치 — 네이티브 ATT 함수 없음)
     MobileAds.Initialize(_ => LoadAd());
 #endif
   }

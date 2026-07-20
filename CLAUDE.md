@@ -98,11 +98,13 @@
 - [x] 웹 경품 신청 페이지 제작 (Cafe24/reward-claim.html) — 코드 검증 + 배송 주소 제출
 - [x] RewardManager: code_index/{코드}에 동시 저장 로직 추가 — 웹 검증용 (deviceId, createdAt 필드 포함)
 - [x] 기존 발급 코드 2건 code_index/에 수동 백필 (Firebase 콘솔)
+- [x] iOS 설정/클리어 버튼 무반응의 진짜 원인 규명 — activeInputHandler가 0(Input Manager only)로 잘못 설정되어 EventSystem의 Input System UI Input Module과 mismatch. Both(2)로 복구. UIDocument pickingMode/display 수정은 실제 원인이 아니었음 (v1.0.1의 pickingMode 수정은 그대로 유지)
+- [x] 사고 후 Firebase 네이티브 라이브러리 재복구 (FirebaseCppApp-13_13_0.bundle/.so) — Firebase Unity SDK 13.13.0 재임포트로 복원. 이 파일들은 100MB 초과로 .gitignore 등록되어 있어 로컬만 존재. macOS Gatekeeper quarantine 제거 필요
 
 ## 다음 할 일 (TODO)
 - [ ] Android v1.0 심사 결과 대기 (Google Play)
 - [ ] Android v1.0.1 빌드 & 배포 — code_index 저장 로직 반영 (v1.0 심사 통과 후)
-- [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 반영
+- [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 + **activeInputHandler=Both 복구** 반영 (설정/클리어 버튼 무반응 진짜 fix)
 - [ ] app-ads.txt 크롤링 완료 확인 (AdMob 콘솔 "업데이트 확인") — 최대 24~48시간 소요
 - [ ] (나중에) 절차적 레벨 생성 검토
 

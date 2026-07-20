@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyASKGCXH4t2K1iCSdZ6o8E4whlU85P_AO8</string>
+	<key>GCM_SENDER_ID</key>
+	<string>129523993912</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>kr.co.nanabox.nanapuzzle</string>
+	<key>PROJECT_ID</key>
+	<string>nana-53f2e</string>
+	<key>STORAGE_BUCKET</key>
+	<string>nana-53f2e.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:129523993912:ios:a2151bd7119d53fa6405cd</string>
+	<key>DATABASE_URL</key>
+	<string>https://nana-53f2e-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>
