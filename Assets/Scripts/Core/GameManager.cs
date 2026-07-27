@@ -13,6 +13,11 @@ public class GameManager : MonoBehaviour
   public RewardManager rewardManager; // 모든 레벨 클리어 시 보상 처리. 인스펙터에서 연결
   public AdManager adManager;         // 전면 광고 관리. 인스펙터에서 연결
 
+#if UNITY_EDITOR
+  [Header("에디터 전용 (빌드에는 영향 없음)")]
+  public LevelData editorTestLevel;  // 값이 있으면 랜덤/진행 무시하고 이 레벨만 계속 로드
+#endif
+
   // 그룹 경계. 진입장벽 낮추기 위해 1~10은 순차 고정, 나머지는 그룹 안에서만 랜덤
   // asset index 기준: [0,10) [10,30) [30,70) [70,100)
   static readonly int[] GroupBoundaries = { 0, 10, 30, 70, 100 };
@@ -30,10 +35,28 @@ public class GameManager : MonoBehaviour
     Application.targetFrameRate = 60;
     QualitySettings.vSyncCount = 0;
 
+#if UNITY_EDITOR
+    if (editorTestLevel != null)
+    {
+      ShowEditorTestLevel();
+      return;
+    }
+#endif
+
     ClearPrefsIfReinstalled();
     LoadProgress();
     PickAndLoadNext();
   }
+
+#if UNITY_EDITOR
+  // 에디터 테스트 모드: 진행/저장 무시. 매번 이 레벨만 다시 로드.
+  void ShowEditorTestLevel()
+  {
+    if (levelText != null)      levelText.text      = "TEST";
+    if (roundCountText != null) roundCountText.text = "TEST";
+    board.ShowLevel(editorTestLevel);
+  }
+#endif
 
   // Android 재설치 감지: firstInstallTime이 달라지면 새로 설치된 것 → PlayerPrefs 초기화
   // Google 자동 백업이 PlayerPrefs를 복원해도 firstInstallTime은 새 값이므로 올바르게 감지됨
@@ -156,6 +179,15 @@ public class GameManager : MonoBehaviour
   // BoardRenderer가 레벨을 다 채우면 호출
   public void OnLevelSolved()
   {
+#if UNITY_EDITOR
+    if (editorTestLevel != null)
+    {
+      // 테스트 모드: 클리어해도 진행 저장 없이 같은 판 다시
+      StartCoroutine(ReloadEditorTestAfterDelay());
+      return;
+    }
+#endif
+
     // 이번 클리어를 마스크에 반영 (같은 판을 중복 카운트하지 않도록 방어)
     if (!cleared[currentIndex])
     {
@@ -167,6 +199,14 @@ public class GameManager : MonoBehaviour
     bool allDone = clearedCount >= levels.Length;
     StartCoroutine(GoToNextAfterDelay(allDone));
   }
+
+#if UNITY_EDITOR
+  IEnumerator ReloadEditorTestAfterDelay()
+  {
+    yield return new WaitForSeconds(1.0f);
+    ShowEditorTestLevel();
+  }
+#endif
 
   IEnumerator GoToNextAfterDelay(bool allDone)
   {
@@ -190,7 +230,13 @@ public class GameManager : MonoBehaviour
   }
 
   // UI Button의 OnClick에서 호출
-  public void RestartLevel() { LoadLevel(currentIndex); }
+  public void RestartLevel()
+  {
+#if UNITY_EDITOR
+    if (editorTestLevel != null) { ShowEditorTestLevel(); return; }
+#endif
+    LoadLevel(currentIndex);
+  }
   public void GoToLevel1()   { ResetAndRestart(); }
 
   // 설정창 "처음부터 시작" → 저장된 진행 상황을 지우고 새로 시작

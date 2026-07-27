@@ -23,16 +23,22 @@
 - Assets/Firebase      — Firebase SDK (FirebaseApp, Firestore)
 - Assets/ExternalDependencyManager — Firebase EDM4U
 - Assets/GoogleMobileAds — Google Mobile Ads SDK (AdMob)
+- Assets/Editor        — 에디터 도구 (iOSPostBuild, LevelSolverWindow)
+- Assets/Plugins/iOS   — iOS 네이티브 플러그인 (ATTBridge.mm, ScreenCaptureBridge.mm)
 
 ## 핵심 파일
 - LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
 - BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
-- GameManager.cs: 레벨 목록과 지금 몇 번째인지, 진행 상황 저장·불러오기(PlayerPrefs), 다음 레벨/다시하기, 레벨 번호 텍스트(LevelText) 표시. 마지막 레벨 클리어 시 RewardManager.ShowReward() 호출.
+- GameManager.cs: 레벨 목록·진행 상태 관리. 랜덤 셔플 로직(1~10 순차 / 11-30·31-70·71-100 그룹 안 미클리어 풀 랜덤). 매 판 선택 시점마다 재선택(옵션 B, 앱 재실행·클리어 모두). PlayerPrefs에 clearedCount(int) + clearedMask(100자 "01" 문자열) 저장. 구버전 currentLevel은 마이그레이션(앞 N개 클리어 처리). 진행도 표시 "N/100"을 levelText·roundCountText 두 곳에. 100판 클리어 시 RewardManager.ShowReward() 호출. `editorTestLevel` 필드(#if UNITY_EDITOR): 값이 있으면 랜덤 무시하고 그 레벨만 반복 로드(테스트용, 빌드엔 미포함).
 - RewardManager.cs: 모든 레벨 클리어 시 랜덤 인증코드(예: A3K9-XZ21) 생성. Firebase Firestore에 기기 ID 키로 저장(중복 방지). UI Toolkit 기반 RewardPanel 제어. RewardUI GameObject에 UIDocument와 함께 부착.
 - AdManager.cs: 전면 광고 로드/표시 담당. N레벨마다 광고 표시 (기본 3레벨) + 막혀서 리셋 N번마다 광고 표시 (기본 4번). 인스펙터에서 횟수 조정 가능. useTestAd 체크 해제 시 실제 광고로 전환.
 - SettingsPanel.cs: UI Toolkit 기반 설정 패널 제어. SettingsUI GameObject에 UIDocument와 함께 부착. SettingsManager와 분리되어 있어 UI만 담당.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 - Assets/google-services.json: Firebase 프로젝트 설정 파일. 패키지명 com.nanaBox.NANApuzzle.
+- LevelSolverWindow.cs: (Editor 툴, Tools > NANA > Level Solver 메뉴) 각 레벨의 Hamiltonian path 개수를 DFS+백트래킹으로 세서 난이도 등급 매김. 30초 타임아웃, 100+ 조기 종료, 연결성 pruning 적용. Level Generator 섹션: shape 템플릿(Rectangle/Diamond/Cross/Hexagon) + 구조적 clustered 배치 → solver 검증해서 목표 정답 범위에 맞는 후보만 뽑음. 후보 채택 시 대상 LevelData asset 덮어쓰기 가능.
+- ScreenCaptureProtection.cs: 캡처 방지. Android는 UI 스레드에서 FLAG_SECURE 세팅(스크린샷·녹화·미러링 완전 차단). iOS는 UIScreen.isCaptured 폴링해 감지 시 최상단 검은 오버레이(sortingOrder=32767). 씬에 GameObject 하나 만들어 부착. Android는 runOnUiThread가 비동기라 람다 안에서 activity를 재획득해야 함(dispose 이슈).
+- ScreenCaptureBridge.mm: iOS 네이티브 브릿지. `_IsScreenBeingCaptured()` 하나만 노출. UIKit 프레임워크 사용.
+- UpdateChecker.cs: 강제 업데이트 유도. 앱 시작 시 Firestore `config/app_version` 문서에서 `androidLatestVersion`/`iosLatestVersion` 조회 후 Application.version과 비교. System.Version으로 비교, 낮으면 UGUI 팝업(반투명 배경 + 흰 카드 + [닫기]/[업데이트]). [업데이트]는 스토어 URL 열기(Android market://, iOS apps.apple.com/app/id{IosAppId}). 에디터에선 `#if UNITY_EDITOR return`으로 스킵. 팝업은 매번 뜸(닫아도 세션 안 저장).
 
 ## UI Toolkit 구조
 - SettingsUI (GameObject): UIDocument + SettingsPanel.cs. Assets/UI/SettingsPanel.uxml/uss 사용.
@@ -45,6 +51,13 @@
 - 칸 좌표는 Vector2Int (x=열, y=행), (0,0)은 왼쪽 아래.
 - 시작 칸에서 출발, 상하좌우 인접 칸만 이동, 이미 채운 칸 재방문 불가, 막힌 칸 이동 불가.
 - 채운 칸 리스트(path) 길이가 전체 칸 수와 같으면 클리어.
+
+## 레벨 진행 로직 (랜덤 셔플)
+- **1~10**: 순차 진행 (진입장벽 유지)
+- **11-30 / 31-70 / 71-100**: 각 그룹 안에서 미클리어 판 풀에서 랜덤 뽑기
+- **매판 재선택 (옵션 B)**: 앱 재실행할 때마다 미클리어 풀에서 다시 랜덤 → 하던 판이 그대로 안 나올 수 있음. 리롤 편법(앱 껐다 켜기) 감수함.
+- 화면 표시는 실제 레벨 번호가 아니라 진행도 "N/100" (levelText·roundCountText 둘 다).
+- 구버전 유저 마이그레이션: legacy `currentLevel` → 앞 N개(index 0~N-1) 클리어로 간주.
 
 ## 진행 상황 (완료)
 - [x] 폴더 구조, Git 초기화 및 첫 커밋
@@ -87,7 +100,7 @@
 - [x] iOS App Store 심사 제출 (v1.0 build 1)
 - [x] iOS App Store 출시 완료 (v1.0)
 - [x] AdMob 앱 등록 (iOS 출시 후 광고 미노출 → 등록으로 해결)
-- [x] app-ads.txt 개발자 도메인(nanabox.co.kr)에 배포 — Google 크롤링 대기 중
+- [x] app-ads.txt 개발자 도메인(nanabox.co.kr)에 배포 및 AdMob 인증 완료
 - [x] iOS UIDocument pickingMode 버그 수정 — 설정창 버튼 터치 불가 문제 (SettingsPanel, RewardManager)
 - [x] iOS v1.0.1 업데이트 배포 (UIDocument 터치 버그 수정 포함)
 - [x] Android Play Store 심사 제출 (v1.0 build 1)
@@ -100,13 +113,25 @@
 - [x] 기존 발급 코드 2건 code_index/에 수동 백필 (Firebase 콘솔)
 - [x] iOS 설정/클리어 버튼 무반응의 진짜 원인 규명 — activeInputHandler가 0(Input Manager only)로 잘못 설정되어 EventSystem의 Input System UI Input Module과 mismatch. Both(2)로 복구. UIDocument pickingMode/display 수정은 실제 원인이 아니었음 (v1.0.1의 pickingMode 수정은 그대로 유지)
 - [x] 사고 후 Firebase 네이티브 라이브러리 재복구 (FirebaseCppApp-13_13_0.bundle/.so) — Firebase Unity SDK 13.13.0 재임포트로 복원. 이 파일들은 100MB 초과로 .gitignore 등록되어 있어 로컬만 존재. macOS Gatekeeper quarantine 제거 필요
+- [x] Level Solver + Generator 에디터 툴 제작 (Assets/Editor/LevelSolverWindow.cs) — 정답 경로 카운팅, 배치 스캔, shape 템플릿(다이아/십자/육각), clustered 랜덤 배치, cancel 버튼. 전체 100 레벨 등급 매김 완료 (Test/Solver_result.txt)
+- [x] 난이도 곡선 검증 — 1~69는 대부분 정답 1~15개(적절한 어려움), 73~90은 대부분 100+(너무 쉬움), 91~98 일부 타임아웃(매우 어려움)
+- [x] Shape 가설 검증 완료 — 8×8 다이아몬드(40칸)가 11×11 사각형(121칸)보다 훨씬 어려움. 격자 크기가 아니라 shape 구조가 난이도 지배 요인
+- [x] 난이도 조정 스코프 축소 합의 — 73~89는 유지, 90~100 중 "쉬움"인 5개(90, 93, 96, 99, 100)만 재설계 예정
+- [x] Level 73, 74 실험적 재설계 — 73은 Diamond 8×8, 74는 Hexagon 8×8. Shape 가설 검증 과정에서 적용된 것. 합의 스코프 밖이라 유지 vs 원복 결정 필요
+- [x] 레벨 랜덤 셔플 로직 도입 — 1~10 순차 / 11-30·31-70·71-100 그룹 안 미클리어 풀 랜덤. 매판 재선택(옵션 B). 저장은 clearedCount + clearedMask 100자 문자열. 구버전 마이그레이션 포함.
+- [x] 스크린 캡처 방지 (ScreenCaptureProtection + ScreenCaptureBridge.mm) — Android FLAG_SECURE 완전 차단 / iOS 감지 오버레이
+- [x] 강제 업데이트 팝업 (UpdateChecker.cs) — Firestore `config/app_version` 문서에서 최신 버전 조회 후 낮으면 [닫기]/[업데이트] 팝업
+- [x] 에디터 전용 `editorTestLevel` 필드 — GameManager에 특정 레벨 드래그하면 랜덤 무시하고 그 레벨만 반복(테스트용, 빌드엔 미포함)
+- [x] Android v1.0.3 배포 — 랜덤 셔플 + 캡처 방지 + 강제 업데이트 팝업 포함
 
 ## 다음 할 일 (TODO)
-- [ ] Android v1.0 심사 결과 대기 (Google Play)
-- [ ] Android v1.0.1 빌드 & 배포 — code_index 저장 로직 반영 (v1.0 심사 통과 후)
-- [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 + **activeInputHandler=Both 복구** 반영 (설정/클리어 버튼 무반응 진짜 fix)
-- [ ] app-ads.txt 크롤링 완료 확인 (AdMob 콘솔 "업데이트 확인") — 최대 24~48시간 소요
-- [ ] (나중에) 절차적 레벨 생성 검토
+- [ ] Android v1.0.3 실기 재검증 — 스크린 캡처 방지가 처음엔 안 걸림(runOnUiThread + using dispose 이슈). 람다 안 activity 재획득으로 수정 후 재빌드 필요할 수 있음. 최근앱 미리보기가 검게 나오는지 확인.
+- [ ] 강제 업데이트 팝업 실기 검증 — Firestore에서 `androidLatestVersion`을 잠깐 v1.0.3보다 높게 바꿔서 팝업 뜨는지 확인, 확인 후 원복
+- [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 + **activeInputHandler=Both 복구** + 랜덤 셔플 + 캡처 방지 + 강제 업데이트 반영
+- [ ] iOS 실기 테스트 — 라이트닝 케이블 준비하거나 TestFlight 업로드로 검증
+- [ ] **Level 90, 93, 96, 99, 100 재설계** — Level Solver Generator 사용, 8×8 shape 위주 (Diamond/Hexagon/Cross). 각각 정답 1~30 목표로 후보 뽑아 채택. 참조: [[project-level-90-100-redesign]]
+- [ ] Level 73, 74 실험 변경 처리 — 요구자와 확인 후 유지할지 원복할지 결정. 실기 플레이해서 어려운지 검증 후 판단 권장
+- [ ] Level 91, 92, 94, 95, 97, 98 (타임아웃 = 이미 매우 어려움) 유지. 건들지 말 것
 
 ## 협업 방식 메모
 - 사용자는 Unity 입문자. 한국어로 단계별로 자세히 안내할 것.
