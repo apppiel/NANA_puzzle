@@ -9,12 +9,13 @@ using TMPro;
 // - 리셋 시 -1, 0 되면 잠금 오버레이
 // - 광고 시청 시 +3
 // - 판 클리어 시: 3 미만이면 3으로 리필, 3 이상이면 그대로 유지 (누적 자원 소모형)
-// - 자동 복구: 3 미만으로 떨어지면 30분 카운트, 30분 경과 시 한꺼번에 3으로 리필
+// - 자동 복구: 3 미만이면 10분마다 1개씩 회복 (상한 3). 하트 옆 recoveryTimerText에 다음 회복까지 MM:SS 표시.
 public class LivesSystem : MonoBehaviour
 {
   [Header("연결")]
   public AdManager adManager;          // 보상형 광고 호출
   public TMP_Text livesText;           // 상단 "x3" 표시. 없어도 동작함
+  public TMP_Text recoveryTimerText;   // 하트 옆 다음 회복까지 카운트다운(MM:SS). 3 미만일 때만 표시. 없어도 동작함
   public Button fillButton;          // "+ 목숨 채우기" 버튼. 없어도 동작함
   public LoadingScreen loadingScreen;  // 로딩 끝나기 전까지 잠금 팝업 표시를 지연. 미연결 시 즉시 표시
 
@@ -25,7 +26,7 @@ public class LivesSystem : MonoBehaviour
   const int BaseLives = 3;                    // 기본값 · 자동 복구 상한 · 판 클리어 리필 목표
   const int MaxLives = 99;                   // 광고 누적 절대 상한
   const int RewardPerAd = 3;
-  const long RecoverIntervalMs = 30L * 60L * 1000L;    // 30분
+  const long RecoverIntervalMs = 10L * 60L * 1000L;    // 10분마다 1개 회복
 
   // PlayerPrefs 키
   const string CurrentKey = "livesCurrent";
@@ -33,22 +34,26 @@ public class LivesSystem : MonoBehaviour
 
   // 상태
   int current;
-  long lastLostAt;   // 3 미만으로 떨어진 순간의 Unix ms. 3 이상이면 0.
+  long lastLostAt;   // 다음 회복 tick의 앵커(Unix ms). 회복 발생 시 그만큼 앞으로 이동. 3 이상이면 0.
 
   // 잠금 오버레이
   Canvas overlayCanvas;
-  Text countdownText;
+  Text statusText;   // 팝업 안 상태 메시지("광고 준비 중..." 등)
 
   IEnumerator Start()
   {
     LoadState();
     ApplyAutoRecovery();
     UpdateHudText();
+    UpdateRecoveryTimerText();
 
     // 라운드 스프라이트 자동 생성 (팝업 카드·버튼 배경에서 재사용)
     roundedSprite = BuildRoundedSprite(64, 16);
 
     if (fillButton != null) fillButton.onClick.AddListener(RequestRewardedAd);
+
+    // 하트 < 3인 동안 매초 회복 체크 + 타이머 UI 갱신 + 잠금 오버레이 자동 해제.
+    StartCoroutine(TickRecovery());
 
     // 로딩 스크린이 alpha 페이드 후 gameObject.SetActive(false) 될 때까지 대기.
     // 안 하면 로딩 화면 위에 잠금 팝업이 겹쳐 보임.
@@ -114,19 +119,25 @@ public class LivesSystem : MonoBehaviour
     PlayerPrefs.Save();
   }
 
-  // ── 자동 복구 (30분 카운트 후 한 번에 3으로 리필) ──────
+  // ── 자동 복구 (10분마다 1개씩, 상한 3) ─────────────────
 
-  // 앱 재실행 시점·잠금 UI 켜져 있는 동안 매초 호출됨.
-  // lastLostAt 이후 30분이 지나면 current를 3으로 리필(카운트 종료).
+  // 앱 재실행 시점·매초 TickRecovery에서 호출됨.
+  // lastLostAt 이후 경과 시간을 10분으로 나눈 만큼 회복. 앵커를 그만큼 앞으로 이동시켜 남은 카운트 유지.
+  // 앱을 오래 껐다 켰을 때도 정확히 계산됨(예: 25분 후 켜면 2개 회복 + 5분 남은 카운트 유지).
   void ApplyAutoRecovery()
   {
     if (current >= BaseLives) { lastLostAt = 0; return; }
     if (lastLostAt <= 0) return;
 
-    if (NowMs() - lastLostAt < RecoverIntervalMs) return;
+    long elapsed = NowMs() - lastLostAt;
+    if (elapsed < RecoverIntervalMs) return;
 
-    current = BaseLives;
-    lastLostAt = 0;
+    int ticks = (int)(elapsed / RecoverIntervalMs);
+    int need = BaseLives - current;
+    int gained = Mathf.Min(ticks, need);
+    current += gained;
+    if (current >= BaseLives) lastLostAt = 0;
+    else lastLostAt += (long)gained * RecoverIntervalMs;
     SaveState();
   }
 
@@ -144,6 +155,7 @@ public class LivesSystem : MonoBehaviour
       lastLostAt = NowMs();
     SaveState();
     UpdateHudText();
+    UpdateRecoveryTimerText();
     if (current <= 0) ShowLockOverlay();
   }
 
@@ -156,6 +168,7 @@ public class LivesSystem : MonoBehaviour
       lastLostAt = 0;
       SaveState();
       UpdateHudText();
+      UpdateRecoveryTimerText();
       HideLockOverlay();
     }
     // else: current 그대로 유지 (누적 자원은 소모형)
@@ -168,6 +181,7 @@ public class LivesSystem : MonoBehaviour
     if (current >= BaseLives) lastLostAt = 0;   // 3 도달 시 카운트 종료
     SaveState();
     UpdateHudText();
+    UpdateRecoveryTimerText();
     HideLockOverlay();
   }
 
@@ -189,7 +203,7 @@ public class LivesSystem : MonoBehaviour
 
   void SetLockStatus(string msg)
   {
-    if (countdownText != null) countdownText.text = msg;
+    if (statusText != null) statusText.text = msg;
   }
 
   // 잠금 오버레이. UpdateChecker와 같은 방식(코드로 Canvas·Card 생성)
@@ -224,24 +238,21 @@ public class LivesSystem : MonoBehaviour
       new Vector2(20, -90), new Vector2(-20, -20));
 
     AddText(cardGo, "Message",
-      "광고를 시청하면 하트가 채워집니다.\n또는 시간이 지나면 자동으로 복구됩니다.",
+      "과자가 기다리고 있어요!!",
       24, new Color(0.2f, 0.2f, 0.2f), TextAnchor.MiddleCenter,
       new Vector2(0, 0.6f), new Vector2(1, 0.78f), new Vector2(0.5f, 0.5f),
       new Vector2(30, 0), new Vector2(-30, 0));
 
-    countdownText = AddText(cardGo, "Countdown", "",
+    statusText = AddText(cardGo, "Status", "",
       28, new Color(0.5f, 0.3f, 0.3f), TextAnchor.MiddleCenter,
       new Vector2(0, 0.35f), new Vector2(1, 0.58f), new Vector2(0.5f, 0.5f),
       new Vector2(30, 0), new Vector2(-30, 0));
 
-    AddButton(cardGo, "Watch", "광고 보기",
+    AddButton(cardGo, "Watch", "하트 채우러 가기",
       new Vector2(0.1f, 0.06f), new Vector2(0.9f, 0.28f),
       new Color(1f, 0.54f, 0.54f), Color.white,
       RequestRewardedAd,
       roundedSprite);
-
-    UpdateCountdownText();
-    StartCoroutine(TickCountdown());
   }
 
   void HideLockOverlay()
@@ -249,36 +260,38 @@ public class LivesSystem : MonoBehaviour
     if (overlayCanvas == null) return;
     Destroy(overlayCanvas.gameObject);
     overlayCanvas = null;
-    countdownText = null;
+    statusText = null;
   }
 
-  IEnumerator TickCountdown()
+  // 매초 회복 체크 + 하트 옆 타이머 UI 갱신 + 잠금 오버레이 자동 해제.
+  // 앱 실행 중 계속 돎(오브젝트 파괴 시 자동 종료).
+  IEnumerator TickRecovery()
   {
     var wait = new WaitForSeconds(1f);
-    while (overlayCanvas != null && current <= 0)
+    while (true)
     {
+      int prev = current;
       ApplyAutoRecovery();
-      if (current > 0)
-      {
-        UpdateHudText();
-        HideLockOverlay();
-        yield break;
-      }
-      UpdateCountdownText();
+      if (current != prev) UpdateHudText();
+      UpdateRecoveryTimerText();
+      if (current > 0 && overlayCanvas != null) HideLockOverlay();
       yield return wait;
     }
   }
 
-  void UpdateCountdownText()
+  void UpdateRecoveryTimerText()
   {
-    if (countdownText == null) return;
-    if (lastLostAt <= 0) { countdownText.text = ""; return; }
-
+    if (recoveryTimerText == null) return;
+    if (current >= BaseLives || lastLostAt <= 0)
+    {
+      recoveryTimerText.text = "";
+      return;
+    }
     long remain = RecoverIntervalMs - (NowMs() - lastLostAt);
     if (remain < 0) remain = 0;
     int mins = (int)(remain / 60000);
     int secs = (int)((remain / 1000) % 60);
-    countdownText.text = $"하트 회복까지 {mins:D2}:{secs:D2}";
+    recoveryTimerText.text = $"{mins:D2}:{secs:D2}";
   }
 
   // ── UI 헬퍼 (UpdateChecker와 동일 스타일) ────────────────

@@ -39,6 +39,9 @@ public class SettingsPanel : MonoBehaviour
     root.pickingMode = PickingMode.Ignore;
   }
 
+  // BackButtonHandler에서 뒤로가기 시 열림 상태 확인용
+  public bool IsOpen => overlay != null && overlay.resolvedStyle.display == DisplayStyle.Flex;
+
   // ⚙️ 버튼의 OnClick에 연결 (기존과 동일하게 public 유지)
   public void Open()
   {

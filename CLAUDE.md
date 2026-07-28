@@ -39,7 +39,9 @@
 - ScreenCaptureProtection.cs: 캡처 방지. Android는 UI 스레드에서 FLAG_SECURE 세팅(스크린샷·녹화·미러링 완전 차단). iOS는 UIScreen.isCaptured 폴링해 감지 시 최상단 검은 오버레이(sortingOrder=32767). 씬에 GameObject 하나 만들어 부착. Android는 runOnUiThread가 비동기라 람다 안에서 activity를 재획득해야 함(dispose 이슈).
 - ScreenCaptureBridge.mm: iOS 네이티브 브릿지. `_IsScreenBeingCaptured()` 하나만 노출. UIKit 프레임워크 사용.
 - UpdateChecker.cs: 강제 업데이트 유도. 앱 시작 시 Firestore `config/app_version` 문서에서 `androidLatestVersion`/`iosLatestVersion` 조회 후 Application.version과 비교. System.Version으로 비교, 낮으면 UGUI 팝업(반투명 배경 + 흰 카드 + [종료]/[업데이트]). **[종료] = Application.Quit** (강제 업데이트라 팝업만 없애는 우회 차단, 다음 실행 때 Start()가 다시 돌면서 팝업 재표시). [업데이트]는 스토어 URL 열기(Android market://, iOS apps.apple.com/app/id{IosAppId}). 에디터에선 `#if UNITY_EDITOR return`으로 스킵. Start()에서만 체크하므로 백그라운드 복귀는 트리거 안 됨 — [종료] 유도로 이 문제 해소.
-- LivesSystem.cs: 목숨(하트) 시스템. **규칙**: 기본 3(최대 99), 리셋마다 -1, 판 클리어 시 3 미만이면 3으로 리필/3 이상이면 그대로 유지(누적 자원 소모형), 광고 시청 시 +3. 자동 복구: 3 미만 진입 순간부터 30분 카운트, 30분 경과 시 한 번에 3으로 리필. **저장**: PlayerPrefs `livesCurrent` + `livesLostAt` 두 키. **UI**: 상단 하트 표시(TMP_Text, 씬에서 세팅) + [+ 목숨 채우기] 버튼(자발적 광고 시청) + 잠금 오버레이(코드로 Canvas 생성, 라운드 스프라이트도 procedural 생성). 로딩 스크린 사라진 뒤에만 오버레이 표시(LoadingScreen 참조). AdManager.ShowRewardedAd 완주 콜백으로 리필. **Task #7 논의**: 하트 4+ 상태에서 광고 강제 로직은 광고 시청 인센티브 소멸 위험으로 폐기 결정.
+- LivesSystem.cs: 목숨(하트) 시스템. **규칙**: 기본 3(최대 99), 리셋마다 -1, 판 클리어 시 3 미만이면 3으로 리필/3 이상이면 그대로 유지(누적 자원 소모형), 광고 시청 시 +3. **자동 복구**: 3 미만이면 **10분마다 1개씩** 회복(상한 3). `lastLostAt`은 다음 회복 tick의 앵커로 사용되어, tick 발생 시 그만큼 앵커를 앞으로 이동시켜 남은 카운트 유지. 앱을 오래 껐다 켜도 정확히 계산(예: 25분 후 → 2개 회복 + 5분 남은 카운트 유지). **저장**: PlayerPrefs `livesCurrent` + `livesLostAt` 두 키. **UI**: 상단 하트 표시(TMP_Text) + 하트 옆 `recoveryTimerText`(MM:SS, 하트 < 3일 때만 표시) + [+ 목숨 채우기] 버튼(자발적 광고 시청) + 잠금 오버레이(코드로 Canvas 생성, 라운드 스프라이트도 procedural 생성). `TickRecovery` 코루틴이 항상 돌면서 매초 회복 체크·타이머 갱신·잠금 오버레이 자동 해제(하트 0→1로 회복 시 자동 잠금 해제). 로딩 스크린 사라진 뒤에만 오버레이 표시. AdManager.ShowRewardedAd 완주 콜백으로 리필. **Task #7 논의**: 하트 4+ 상태에서 광고 강제 로직은 광고 시청 인센티브 소멸 위험으로 폐기 결정.
+- BackButtonHandler.cs: 안드로이드 뒤로가기 버튼 처리(KeyCode.Escape 매핑, iOS는 자연스레 no-op). 우선순위: (1)자기 팝업 뜸→닫기 (2)강제 업데이트 팝업(UpdatePromptCanvas)→무시 (3)설정창(SettingsPanel.IsOpen)→닫기 (4)그 외(하트 잠금 포함)→종료 확인 팝업. 팝업: 반투명 배경 + 라운드 흰 카드 + [돌아가기]/[종료하기] 버튼(카드/버튼 모두 procedural rounded sprite). sortingOrder 29500(LivesLock 29000보다 위, UpdatePrompt 30000보다 아래). 씬에 빈 GameObject 만들어 부착, 인스펙터의 Settings Panel 슬롯에 SettingsUI 연결.
+- SettingsPanel.cs: BackButtonHandler에서 열림 상태 확인용 `public bool IsOpen` 프로퍼티 노출(`overlay.resolvedStyle.display == Flex`).
 
 ## UI Toolkit 구조
 - SettingsUI (GameObject): UIDocument + SettingsPanel.cs. Assets/UI/SettingsPanel.uxml/uss 사용.
@@ -63,12 +65,13 @@
 - 구버전 유저 마이그레이션: legacy `currentLevel` → 앞 N개(index 0~N-1) 클리어로 간주.
 
 ## 목숨(하트) 시스템
-- **표시**: 상단 `x N` 형태 (하트 아이콘 + TMP_Text)
+- **표시**: 상단 `x N` 형태 (하트 아이콘 + TMP_Text) + 옆에 회복 카운트 MM:SS (하트 < 3일 때만 노출)
 - **규칙**: 기본 3(상한 99), 리셋 -1, 광고 시청 +3, 판 클리어 시 3 미만이면 3 리필/3 이상이면 유지
-- **잠금**: 목숨 0 → 오버레이(반투명+흰 카드+[광고 보기]+카운트다운). LoadingScreen 사라진 뒤에만 표시
-- **자동 복구**: 3 미만 → 30분 카운트 → 한 번에 3으로 리필
-- **광고 로드 실패(Private DNS 등)**: 유저는 30분 대기해야 함 (강경 정책, 의식적 트레이드오프)
+- **잠금**: 목숨 0 → 오버레이(반투명+흰 카드+[하트 채우러 가기]). LoadingScreen 사라진 뒤에만 표시. 하트 0→1 회복 순간 자동 해제
+- **자동 복구**: 3 미만 → **10분마다 1개씩** 회복(상한 3). 0에서 3까지 총 30분 소요
+- **광고 로드 실패(Private DNS 등)**: 유저는 10분 대기하면 1개는 회복됨 (강경 정책 완화됨)
 - **자발적 시청**: `+ 목숨 채우기` 버튼으로 언제든 +3 스택 가능
+- **뒤로가기 처리**: [[BackButtonHandler.cs]]가 잠금 상태에서도 뒤로가기 → 종료 팝업 띄워줌(탈출 수단 제공)
 
 ## 진행 상황 (완료)
 - [x] 폴더 구조, Git 초기화 및 첫 커밋
@@ -143,9 +146,12 @@
 - [x] LivesSystem 신규 — 목숨 상태 관리, 잠금 오버레이 UI(코드로 Canvas 생성 + procedural 라운드 스프라이트 자동 생성), 자발적 광고 시청 버튼, LoadingScreen 대기 후 표시, PlayerPrefs 저장(livesCurrent + livesLostAt)
 - [x] AdManager "4번 리셋 광고" 로직 삭제 — LivesSystem으로 완전 대체 (판 안 3번 실패 = 하트 소진 = 잠금 오버레이 = 광고 시청)
 - [x] Task #7 "하트 4+ 상태에서 3번 리셋 광고 강제" 도입 검토 → 폐기 — 광고 시청 인센티브 소멸 위험. 하트 시스템만으로 광고 유도 충분
+- [x] LivesSystem 회복 규칙 변경 — 기존 "30분 후 한 번에 3 리필" → "**10분마다 1개씩** 회복(상한 3)". `ApplyAutoRecovery` tick 기반 재작성. 앱 오래 껐다 켜도 정확히 계산됨(elapsed / interval만큼 회복, 앵커 앞으로 이동)
+- [x] LivesSystem 하트 옆 회복 타이머 UI — `recoveryTimerText` 인스펙터 필드 추가, MM:SS 표시. 하트 < 3일 때만 노출. `TickRecovery` 코루틴이 항상 돌며 갱신·잠금 자동 해제
+- [x] BackButtonHandler 신규 — 안드로이드 뒤로가기 → 종료 확인 팝업. 우선순위(자기팝업/UpdateChecker/설정창/그외) 처리. 라운드 카드+버튼. SettingsPanel.IsOpen 프로퍼티 추가로 연동
 
 ## 다음 할 일 (TODO)
-- [ ] **LivesSystem `RecoverIntervalMs` 원복** — 지금 `60L * 1000L`(1분, 테스트용). 배포 전 반드시 `30L * 60L * 1000L`(30분)로 원복
+- [ ] **하트 회복 완료 로컬 알림** — 하트 < 3에서 3 도달 시점에 로컬 알림 예약. Unity `com.unity.mobile.notifications` 패키지 사용(iOS/Android 모두 지원). 앱 종료/백그라운드 상태에서도 OS가 지정 시각에 알림 트레이 표시. 구현 요점: (1)Decrement 시점에 `현재 부족한 하트 × 10분` 후 알림 예약 (2)회복/광고/판 클리어로 3 도달 시 예약 취소 (3)앱 재실행 시 기존 예약 취소 후 상태 재계산해서 재예약 (4)iOS/Android 13+ 알림 권한 요청 필요 (5)알림 문구 예: "하트가 다 찼어요! 다시 시작해볼까요? 🍬"
 - [ ] AdMob 콘솔 실제 Rewarded 광고 unit 활성화 확인 — 생성 직후 몇 시간 지연 있을 수 있음. `useTestAd=false` + 자기 기기 테스트 기기로 등록해서 실기 검증
 - [ ] Android v1.0.4 빌드 — AdManager 광고 카운트 수정 + UpdateChecker [종료] + 목숨 시스템 + 셔플 그룹 확장 반영. bundleVersion을 1.0.4로 올린 뒤 빌드/배포
 - [ ] Android v1.0.3 실기 재검증 — 스크린 캡처 방지가 처음엔 안 걸림(runOnUiThread + using dispose 이슈). 람다 안 activity 재획득으로 수정 후 재빌드 필요할 수 있음. 최근앱 미리보기가 검게 나오는지 확인.
