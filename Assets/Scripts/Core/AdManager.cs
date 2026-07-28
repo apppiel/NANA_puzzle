@@ -59,6 +59,8 @@ public class AdManager : MonoBehaviour
 
   void LoadAd()
   {
+    // 예약된 재시도가 있으면 취소해 중복 로드 방지
+    CancelInvoke(nameof(LoadAd));
     // 기존 광고 오브젝트가 있으면 메모리 해제 후 새로 로드
     interstitialAd?.Destroy();
 
@@ -70,6 +72,8 @@ public class AdManager : MonoBehaviour
       if (error != null)
       {
         Debug.LogWarning("전면 광고 로드 실패: " + error.GetMessage());
+        // 네트워크 일시 장애 등으로 로드 실패 시 30초 뒤 자동 재시도
+        Invoke(nameof(LoadAd), 30f);
         return;
       }
       interstitialAd = ad;
@@ -82,18 +86,20 @@ public class AdManager : MonoBehaviour
   {
     levelClearCount++;
 
-    // N레벨마다 광고 표시
-    if (levelClearCount % showEveryNLevels != 0) return;
+    // 아직 임계치에 못 미치면 대기
+    if (levelClearCount < showEveryNLevels) return;
 
+    // 임계치를 넘겼는데 광고가 준비 안 됐으면 카운트는 유지한 채 로드만 시도
+    // → 다음 클리어에서 광고 준비되면 즉시 표시됨 (기회 놓치지 않음)
     if (interstitialAd != null && interstitialAd.CanShowAd())
     {
+      levelClearCount = 0;
       // 광고가 닫히면 다음 광고를 미리 로드
       interstitialAd.OnAdFullScreenContentClosed += () => LoadAd();
       interstitialAd.Show();
     }
     else
     {
-      // 광고가 준비 안 됐으면 미리 로드만 해둠
       LoadAd();
     }
   }
@@ -103,11 +109,11 @@ public class AdManager : MonoBehaviour
   {
     stuckResetCount++;
 
-    // N번 막힐 때마다 광고 표시
-    if (stuckResetCount % showAdEveryNStucks != 0) return;
+    if (stuckResetCount < showAdEveryNStucks) return;
 
     if (interstitialAd != null && interstitialAd.CanShowAd())
     {
+      stuckResetCount = 0;
       interstitialAd.OnAdFullScreenContentClosed += () => LoadAd();
       interstitialAd.Show();
     }
