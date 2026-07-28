@@ -12,6 +12,7 @@ public class GameManager : MonoBehaviour
   public TMP_Text roundCountText;    // 진행도 표시용 (예: "42 / 100")
   public RewardManager rewardManager; // 모든 레벨 클리어 시 보상 처리. 인스펙터에서 연결
   public AdManager adManager;         // 전면 광고 관리. 인스펙터에서 연결
+  public LivesSystem livesSystem;     // 목숨 시스템. 리셋 이벤트 -1, 클리어 이벤트 리필
 
 #if UNITY_EDITOR
   [Header("에디터 전용 (빌드에는 영향 없음)")]
@@ -19,8 +20,13 @@ public class GameManager : MonoBehaviour
 #endif
 
   // 그룹 경계. 진입장벽 낮추기 위해 1~10은 순차 고정, 나머지는 그룹 안에서만 랜덤
-  // asset index 기준: [0,10) [10,30) [30,70) [70,100)
-  static readonly int[] GroupBoundaries = { 0, 10, 30, 70, 100 };
+  // asset index 기준: [0,10) [10,30) [30,70) [70,110)
+  // 마지막 그룹은 40개 풀에서 30개만 뽑음 → 매 세션마다 못 본 10개가 달라져 재플레이 유도
+  static readonly int[] GroupBoundaries = { 0, 10, 30, 70, 110 };
+
+  // 유저에게 노출되는 총 판 수 (진행도 표시·보상 트리거 기준).
+  // asset 개수(levels.Length=110)와 별개. 71~110 그룹은 40개 풀이지만 유저는 30번만 뽑아 100판 완주로 인식.
+  const int TotalDisplayLevels = 100;
 
   const string LegacyProgressKey = "currentLevel";  // 구버전 유저 마이그레이션용
   const string ClearedCountKey   = "clearedCount";  // 지금까지 클리어한 판 수
@@ -169,7 +175,9 @@ public class GameManager : MonoBehaviour
   {
     currentIndex = index;
     // 지금 도전 중인 판은 (clearedCount + 1) 번째. 진행도 표시.
-    string progress = (clearedCount + 1) + " / " + levels.Length;
+    // asset 개수가 아니라 유저 노출 판 수(100) 기준 — 100판 완주 후 남은 그룹 D 여분 판을 풀 때는 "100 / 100" 유지
+    int display = Mathf.Min(clearedCount + 1, TotalDisplayLevels);
+    string progress = display + " / " + TotalDisplayLevels;
     if (levelText != null)      levelText.text      = progress;
     if (roundCountText != null) roundCountText.text = progress;
 
@@ -196,7 +204,12 @@ public class GameManager : MonoBehaviour
       SaveProgress();
     }
 
-    bool allDone = clearedCount >= levels.Length;
+    // 판 클리어 = 목숨이 3 미만이면 3으로 리필, 아니면 그대로 유지
+    if (livesSystem != null) livesSystem.OnLevelCleared();
+
+    // 유저 관점 완주(100판) = 보상 트리거. asset 110개 중 나머지 10개는 완주 후 자유 플레이용
+    // (그 판을 클리어해도 RewardManager가 기기ID로 중복 발급 차단하니 동일 코드만 재표시됨)
+    bool allDone = clearedCount >= TotalDisplayLevels;
     StartCoroutine(GoToNextAfterDelay(allDone));
   }
 
@@ -223,10 +236,10 @@ public class GameManager : MonoBehaviour
     }
   }
 
-  // BoardRenderer가 막혀서 리셋될 때 호출 → 광고 카운트 증가
+  // BoardRenderer가 막혀서 리셋될 때 호출 → 목숨 -1
   public void OnStuckReset()
   {
-    if (adManager != null) adManager.OnStuckReset();
+    if (livesSystem != null) livesSystem.Decrement();
   }
 
   // UI Button의 OnClick에서 호출

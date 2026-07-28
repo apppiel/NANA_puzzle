@@ -29,16 +29,17 @@
 ## 핵심 파일
 - LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
 - BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
-- GameManager.cs: 레벨 목록·진행 상태 관리. 랜덤 셔플 로직(1~10 순차 / 11-30·31-70·71-100 그룹 안 미클리어 풀 랜덤). 매 판 선택 시점마다 재선택(옵션 B, 앱 재실행·클리어 모두). PlayerPrefs에 clearedCount(int) + clearedMask(100자 "01" 문자열) 저장. 구버전 currentLevel은 마이그레이션(앞 N개 클리어 처리). 진행도 표시 "N/100"을 levelText·roundCountText 두 곳에. 100판 클리어 시 RewardManager.ShowReward() 호출. `editorTestLevel` 필드(#if UNITY_EDITOR): 값이 있으면 랜덤 무시하고 그 레벨만 반복 로드(테스트용, 빌드엔 미포함).
+- GameManager.cs: 레벨 목록·진행 상태 관리. 랜덤 셔플 로직(1~10 순차 / 11-30·31-70·**71-110** 그룹 안 미클리어 풀 랜덤 — 마지막 그룹은 40개 풀에서 30번 뽑음). 매 판 선택 시점마다 재선택(옵션 B, 앱 재실행·클리어 모두). PlayerPrefs에 clearedCount(int) + clearedMask 저장. **TotalDisplayLevels=100 상수** 도입해 asset 개수(110)와 유저 진행도(N/100)·보상 트리거를 분리. 구버전 currentLevel은 마이그레이션. 100판 클리어 시 RewardManager.ShowReward(), 판 클리어 시 livesSystem.OnLevelCleared() 호출. 리셋 이벤트는 livesSystem.Decrement()로 이관. `editorTestLevel` 필드(#if UNITY_EDITOR): 값이 있으면 랜덤 무시하고 그 레벨만 반복 로드.
 - RewardManager.cs: 모든 레벨 클리어 시 랜덤 인증코드(예: A3K9-XZ21) 생성. Firebase Firestore에 기기 ID 키로 저장(중복 방지). UI Toolkit 기반 RewardPanel 제어. RewardUI GameObject에 UIDocument와 함께 부착.
-- AdManager.cs: 전면 광고 로드/표시 담당. N레벨마다 광고 표시 (기본 3레벨) + 막혀서 리셋 N번마다 광고 표시 (기본 4번). 인스펙터에서 횟수 조정 가능. useTestAd 체크 해제 시 실제 광고로 전환.
+- AdManager.cs: 전면 광고 + 보상형 광고 로드/표시. **전면 광고**: N레벨마다 표시(기본 3레벨). 카운트 임계치 방식(`count >= N`) — 광고 준비 안 됐으면 카운트 유지한 채 LoadAd()만 호출 → 다음 클리어에서 즉시 표시. 표시 성공 시에만 count=0 리셋. **보상형 광고**: `ShowRewardedAd(Action onReward)` 노출. 완주 콜백에서 onReward 실행(중도 종료 시 미실행). 로드 실패 시 30초 자동 재시도(`CancelInvoke`로 중복 방지). Rewarded unit ID는 Android/iOS 각각 별도. **기존 "4번 리셋 광고" 로직 삭제됨** — 목숨 시스템(LivesSystem)으로 완전 대체.
 - SettingsPanel.cs: UI Toolkit 기반 설정 패널 제어. SettingsUI GameObject에 UIDocument와 함께 부착. SettingsManager와 분리되어 있어 UI만 담당.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 - Assets/google-services.json: Firebase 프로젝트 설정 파일. 패키지명 com.nanaBox.NANApuzzle.
 - LevelSolverWindow.cs: (Editor 툴, Tools > NANA > Level Solver 메뉴) 각 레벨의 Hamiltonian path 개수를 DFS+백트래킹으로 세서 난이도 등급 매김. 30초 타임아웃, 100+ 조기 종료, 연결성 pruning 적용. Level Generator 섹션: shape 템플릿(Rectangle/Diamond/Cross/Hexagon) + 구조적 clustered 배치 → solver 검증해서 목표 정답 범위에 맞는 후보만 뽑음. 후보 채택 시 대상 LevelData asset 덮어쓰기 가능.
 - ScreenCaptureProtection.cs: 캡처 방지. Android는 UI 스레드에서 FLAG_SECURE 세팅(스크린샷·녹화·미러링 완전 차단). iOS는 UIScreen.isCaptured 폴링해 감지 시 최상단 검은 오버레이(sortingOrder=32767). 씬에 GameObject 하나 만들어 부착. Android는 runOnUiThread가 비동기라 람다 안에서 activity를 재획득해야 함(dispose 이슈).
 - ScreenCaptureBridge.mm: iOS 네이티브 브릿지. `_IsScreenBeingCaptured()` 하나만 노출. UIKit 프레임워크 사용.
-- UpdateChecker.cs: 강제 업데이트 유도. 앱 시작 시 Firestore `config/app_version` 문서에서 `androidLatestVersion`/`iosLatestVersion` 조회 후 Application.version과 비교. System.Version으로 비교, 낮으면 UGUI 팝업(반투명 배경 + 흰 카드 + [닫기]/[업데이트]). [업데이트]는 스토어 URL 열기(Android market://, iOS apps.apple.com/app/id{IosAppId}). 에디터에선 `#if UNITY_EDITOR return`으로 스킵. 팝업은 매번 뜸(닫아도 세션 안 저장).
+- UpdateChecker.cs: 강제 업데이트 유도. 앱 시작 시 Firestore `config/app_version` 문서에서 `androidLatestVersion`/`iosLatestVersion` 조회 후 Application.version과 비교. System.Version으로 비교, 낮으면 UGUI 팝업(반투명 배경 + 흰 카드 + [종료]/[업데이트]). **[종료] = Application.Quit** (강제 업데이트라 팝업만 없애는 우회 차단, 다음 실행 때 Start()가 다시 돌면서 팝업 재표시). [업데이트]는 스토어 URL 열기(Android market://, iOS apps.apple.com/app/id{IosAppId}). 에디터에선 `#if UNITY_EDITOR return`으로 스킵. Start()에서만 체크하므로 백그라운드 복귀는 트리거 안 됨 — [종료] 유도로 이 문제 해소.
+- LivesSystem.cs: 목숨(하트) 시스템. **규칙**: 기본 3(최대 99), 리셋마다 -1, 판 클리어 시 3 미만이면 3으로 리필/3 이상이면 그대로 유지(누적 자원 소모형), 광고 시청 시 +3. 자동 복구: 3 미만 진입 순간부터 30분 카운트, 30분 경과 시 한 번에 3으로 리필. **저장**: PlayerPrefs `livesCurrent` + `livesLostAt` 두 키. **UI**: 상단 하트 표시(TMP_Text, 씬에서 세팅) + [+ 목숨 채우기] 버튼(자발적 광고 시청) + 잠금 오버레이(코드로 Canvas 생성, 라운드 스프라이트도 procedural 생성). 로딩 스크린 사라진 뒤에만 오버레이 표시(LoadingScreen 참조). AdManager.ShowRewardedAd 완주 콜백으로 리필. **Task #7 논의**: 하트 4+ 상태에서 광고 강제 로직은 광고 시청 인센티브 소멸 위험으로 폐기 결정.
 
 ## UI Toolkit 구조
 - SettingsUI (GameObject): UIDocument + SettingsPanel.cs. Assets/UI/SettingsPanel.uxml/uss 사용.
@@ -54,10 +55,20 @@
 
 ## 레벨 진행 로직 (랜덤 셔플)
 - **1~10**: 순차 진행 (진입장벽 유지)
-- **11-30 / 31-70 / 71-100**: 각 그룹 안에서 미클리어 판 풀에서 랜덤 뽑기
-- **매판 재선택 (옵션 B)**: 앱 재실행할 때마다 미클리어 풀에서 다시 랜덤 → 하던 판이 그대로 안 나올 수 있음. 리롤 편법(앱 껐다 켜기) 감수함.
-- 화면 표시는 실제 레벨 번호가 아니라 진행도 "N/100" (levelText·roundCountText 둘 다).
+- **11-30 / 31-70**: 각 그룹 안에서 미클리어 판 풀에서 랜덤 뽑기
+- **71-100 슬롯 (30번 뽑기) = asset index 70~109 풀 (40개)**: 매 세션마다 유저가 못 본 판 10개가 달라져 재플레이 유도
+- **매판 재선택 (옵션 B)**: 앱 재실행할 때마다 미클리어 풀에서 다시 랜덤. 리롤 편법(앱 껐다 켜기) 감수함.
+- 화면 표시는 실제 레벨 번호가 아니라 진행도 "N/100" (`TotalDisplayLevels` 상수). asset 개수(110)와 별개.
+- **100판 클리어 = 보상 트리거**. 이후에도 그룹 D 미클리어 10개 자유 플레이 가능하지만 RewardManager가 중복 발급 차단.
 - 구버전 유저 마이그레이션: legacy `currentLevel` → 앞 N개(index 0~N-1) 클리어로 간주.
+
+## 목숨(하트) 시스템
+- **표시**: 상단 `x N` 형태 (하트 아이콘 + TMP_Text)
+- **규칙**: 기본 3(상한 99), 리셋 -1, 광고 시청 +3, 판 클리어 시 3 미만이면 3 리필/3 이상이면 유지
+- **잠금**: 목숨 0 → 오버레이(반투명+흰 카드+[광고 보기]+카운트다운). LoadingScreen 사라진 뒤에만 표시
+- **자동 복구**: 3 미만 → 30분 카운트 → 한 번에 3으로 리필
+- **광고 로드 실패(Private DNS 등)**: 유저는 30분 대기해야 함 (강경 정책, 의식적 트레이드오프)
+- **자발적 시청**: `+ 목숨 채우기` 버튼으로 언제든 +3 스택 가능
 
 ## 진행 상황 (완료)
 - [x] 폴더 구조, Git 초기화 및 첫 커밋
@@ -123,15 +134,30 @@
 - [x] 강제 업데이트 팝업 (UpdateChecker.cs) — Firestore `config/app_version` 문서에서 최신 버전 조회 후 낮으면 [닫기]/[업데이트] 팝업
 - [x] 에디터 전용 `editorTestLevel` 필드 — GameManager에 특정 레벨 드래그하면 랜덤 무시하고 그 레벨만 반복(테스트용, 빌드엔 미포함)
 - [x] Android v1.0.3 배포 — 랜덤 셔플 + 캡처 방지 + 강제 업데이트 팝업 포함
+- [x] Firestore 보안 규칙에 `config` 컬렉션 추가 (get 허용, list/create/update/delete 차단) — UpdateChecker가 config/app_version 문서 조회하기 위함
+- [x] 강제 업데이트 팝업 부분 실기 검증 (2026-07-28) — 다른 사용자 폰에선 정상 표시 확인. 다만 [닫기]가 팝업만 없애고 앱은 계속 실행돼서 백그라운드 복귀 시 팝업 재표시 안 되는 문제 발견
+- [x] AdManager 광고 카운트 로직 재작성 — 기존 `count % N == 0`은 광고 미준비 시 카운트 소진되어 다음 배수(6, 9)까지 스킵되던 버그. 임계치(`count >= N`) 방식으로 변경 + 표시 성공 시에만 리셋. LoadAd() 실패 시 30초 자동 재시도 추가. 이슈는 셔플과 무관하게 원래부터 존재
+- [x] UpdateChecker [닫기]→[종료] + Application.Quit 동작으로 변경 — 강제 업데이트 우회 차단. 다음 실행 때 Start()가 재실행되며 팝업 다시 뜸
+- [x] 셔플 그룹 D 확장 — GroupBoundaries `{0,10,30,70,110}`으로 확장, TotalDisplayLevels=100 상수 도입. 71-100 슬롯이 40개 풀에서 30개 랜덤. asset 110개 유지하되 유저 진행도/보상 트리거는 100으로 고정
+- [x] AdManager Rewarded 광고 통합 — RewardedAd 로드/표시, ShowRewardedAd(Action) API 노출, 30초 재시도. Android/iOS Rewarded unit ID 각각 입력. 구글 공식 Rewarded 테스트 ID 상수 포함
+- [x] LivesSystem 신규 — 목숨 상태 관리, 잠금 오버레이 UI(코드로 Canvas 생성 + procedural 라운드 스프라이트 자동 생성), 자발적 광고 시청 버튼, LoadingScreen 대기 후 표시, PlayerPrefs 저장(livesCurrent + livesLostAt)
+- [x] AdManager "4번 리셋 광고" 로직 삭제 — LivesSystem으로 완전 대체 (판 안 3번 실패 = 하트 소진 = 잠금 오버레이 = 광고 시청)
+- [x] Task #7 "하트 4+ 상태에서 3번 리셋 광고 강제" 도입 검토 → 폐기 — 광고 시청 인센티브 소멸 위험. 하트 시스템만으로 광고 유도 충분
 
 ## 다음 할 일 (TODO)
+- [ ] **LivesSystem `RecoverIntervalMs` 원복** — 지금 `60L * 1000L`(1분, 테스트용). 배포 전 반드시 `30L * 60L * 1000L`(30분)로 원복
+- [ ] AdMob 콘솔 실제 Rewarded 광고 unit 활성화 확인 — 생성 직후 몇 시간 지연 있을 수 있음. `useTestAd=false` + 자기 기기 테스트 기기로 등록해서 실기 검증
+- [ ] Android v1.0.4 빌드 — AdManager 광고 카운트 수정 + UpdateChecker [종료] + 목숨 시스템 + 셔플 그룹 확장 반영. bundleVersion을 1.0.4로 올린 뒤 빌드/배포
 - [ ] Android v1.0.3 실기 재검증 — 스크린 캡처 방지가 처음엔 안 걸림(runOnUiThread + using dispose 이슈). 람다 안 activity 재획득으로 수정 후 재빌드 필요할 수 있음. 최근앱 미리보기가 검게 나오는지 확인.
-- [ ] 강제 업데이트 팝업 실기 검증 — Firestore에서 `androidLatestVersion`을 잠깐 v1.0.3보다 높게 바꿔서 팝업 뜨는지 확인, 확인 후 원복
-- [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 + **activeInputHandler=Both 복구** + 랜덤 셔플 + 캡처 방지 + 강제 업데이트 반영
+- [ ] v1.0.4 배포 후 [종료] 실기 검증 — 팝업에서 [종료] 탭 시 앱 프로세스 완전 종료(최근 앱 목록에서도 사라짐) → 재실행 시 팝업 재표시 확인
+- [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 + **activeInputHandler=Both 복구** + 랜덤 셔플 + 캡처 방지 + 강제 업데이트 + AdManager 광고 카운트 수정 + UpdateChecker [종료] + 목숨 시스템 + 셔플 그룹 확장 반영. iOS에서 Application.Quit이 심사에 문제되는지 리젝 사례 사전 조사 권장
+- [ ] 새 레벨 Level_101~110 제작 완료 — 90~100 난이도 수준(8×8 Diamond/Hexagon/Cross). GameManager `levels` 배열에 뒤로 10개 드래그해서 총 110개 등록. LevelSolverWindow로 정답 1~30개 목표
+- [ ] LivesSystem 실기 검증 — 하트 소진 → 잠금 UI → [광고 보기] → 실제 Rewarded 광고 재생 → 완주 → +3 리필. Private DNS 차단 유저 케이스도 확인(30분 대기 동작)
 - [ ] iOS 실기 테스트 — 라이트닝 케이블 준비하거나 TestFlight 업로드로 검증
 - [ ] **Level 90, 93, 96, 99, 100 재설계** — Level Solver Generator 사용, 8×8 shape 위주 (Diamond/Hexagon/Cross). 각각 정답 1~30 목표로 후보 뽑아 채택. 참조: [[project-level-90-100-redesign]]
 - [ ] Level 73, 74 실험 변경 처리 — 요구자와 확인 후 유지할지 원복할지 결정. 실기 플레이해서 어려운지 검증 후 판단 권장
 - [ ] Level 91, 92, 94, 95, 97, 98 (타임아웃 = 이미 매우 어려움) 유지. 건들지 말 것
+- [ ] **Private DNS 광고 차단 유저 대응 회의** — 일부 유저가 갤럭시 개인 DNS를 광고 차단 서버로 지정해서 AdMob 로드 실패. 앱 레벨에서 우회 불가능. 대응 옵션: (1) 감내 (2) Firestore에 실패율 익명 로깅해 규모 파악 (3) 광고 없이 진행 못 하게 강경 대응 (4) 보상형 광고 병행 (5) 광고 제거 인앱결제. 규모 데이터 없이 3~5 진행은 오버엔지니어링일 수 있음
 
 ## 협업 방식 메모
 - 사용자는 Unity 입문자. 한국어로 단계별로 자세히 안내할 것.
