@@ -106,10 +106,11 @@ public class UpdateChecker : MonoBehaviour
       new Vector2(0.5f, 0.5f),
       new Vector2(30, 0), new Vector2(-30, 0));
 
-    AddButton(cardGo, "Close", "닫기",
+    // 강제 업데이트라 [종료]는 앱 프로세스 종료. 다음 실행 때 Start()가 다시 돌면서 팝업도 재표시됨
+    AddButton(cardGo, "Close", "종료",
       new Vector2(0.05f, 0.06f), new Vector2(0.48f, 0.28f),
       new Color(0.85f, 0.85f, 0.85f), new Color(0.2f, 0.2f, 0.2f),
-      () => Destroy(overlayCanvas.gameObject));
+      Application.Quit);
 
     AddButton(cardGo, "Update", "업데이트",
       new Vector2(0.52f, 0.06f), new Vector2(0.95f, 0.28f),
