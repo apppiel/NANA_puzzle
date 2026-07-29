@@ -52,6 +52,18 @@
 - USS에서 폰트: `-unity-font: url("../TextMesh Pro/Fonts/NanumSquareRoundEB.ttf")` 로 연결.
 - UIDocument 오브젝트는 눈 아이콘(씬 뷰 숨김)으로 숨기면 런타임에 영향을 주므로 사용 금지. 대신 UXML에서 `style="display: none;"` 으로 초기 숨김 처리.
 
+## UGUI Canvas (HUD) 반응형 세팅
+- **주의**: UGUI Canvas와 UI Toolkit PanelSettings는 별개 시스템. PanelSettings 반응형이라도 UGUI Canvas는 별도 세팅 필요.
+- **CanvasScaler**: Scale With Screen Size / Reference Resolution 1080×2340 (갤럭시 실기 기준) / Match Width(0). 폭 기준이라 UI 원본 크기 유지, 세로가 긴 폰(폴더블/아이폰)에선 여백만 늘어남.
+- **HUD 요소 앵커** (Canvas 자식):
+  - 상단 중앙: LevelText, CountText — Top Center (0.5, 1)
+  - 좌상단: SettingsButton — Top Left (0, 1)
+  - 우상단: Heart, LiveCountText, Timer — Top Right (1, 1)
+  - 하단 중앙: PlusHeartButton — Bottom Center (0.5, 0)
+  - 전체 stretch: LoadingPanel — Stretch (0,0)/(1,1) + AspectRatioFitter Envelope Parent
+- **LoadingPanel AspectRatioFitter**: aspectMode Envelope Parent + aspectRatio 0.4615 (=1080/2340, GameTitle.png 실제 비율). aspectRatio 잘못 잡으면 오버플로우(폭 튀어나옴) — 이미지 비율 바꿀 때 이 값도 같이 바꿔야 함.
+- **함정**: CanvasScaler 기본값이 Constant Pixel Size + 800×600(옛 유니티 기본)이라 초기엔 반응형 아님. 잊고 그대로 두면 실기에서 UI가 어긋남 (2026-07-29 발견·수정).
+
 ## 게임 규칙 / 데이터 모델
 - 칸 좌표는 Vector2Int (x=열, y=행), (0,0)은 왼쪽 아래.
 - 시작 칸에서 출발, 상하좌우 인접 칸만 이동, 이미 채운 칸 재방문 불가, 막힌 칸 이동 불가.
@@ -152,6 +164,7 @@
 - [x] LivesSystem 하트 옆 회복 타이머 UI — `recoveryTimerText` 인스펙터 필드 추가, MM:SS 표시. 하트 < 3일 때만 노출. `TickRecovery` 코루틴이 항상 돌며 갱신·잠금 자동 해제
 - [x] BackButtonHandler 신규 — 안드로이드 뒤로가기 → 종료 확인 팝업. 우선순위(자기팝업/UpdateChecker/설정창/그외) 처리. 라운드 카드+버튼. SettingsPanel.IsOpen 프로퍼티 추가로 연동
 - [x] Android Unity Ads Mediation 통합 (2026-07-29) — AdMob 콘솔에 Android Interstitial/Rewarded 미디에이션 그룹 생성 + Unity Ads 소스 매핑. Unity Ads Dashboard 나나박스 프로젝트/placements 확인. UnityAds Mediation Plugin v3.19.0 Source zip에서 `Assets/GoogleMobileAds/Mediation/UnityAds/`로 수동 복사(UPM 방식은 GoogleMobileAds 11.2.0 Assets 방식과 의존성 불일치로 실패). SJ Phone(광고 ID) AdMob·Unity Ads 양쪽 테스트 기기 등록. Ad Inspector Single Ad Source Test에서 Unity Ads 응답 확인. 평상시 mediation에선 AdMob이 eCPM 경쟁으로 이기는 게 자연스러움
+- [x] UGUI Canvas 반응형 전환 (2026-07-29) — CanvasScaler를 Constant Pixel Size + 800×600 기본값에서 Scale With Screen Size + 1080×2340 + Match Width로 변경. HUD 8개 중 어긋난 3개(SettingsButton→Top Left, Heart/LiveCountText→Top Right)를 Middle Center에서 재앵커링(화면 좌표는 유지). LoadingPanel AspectRatioFitter aspectRatio 0.5625→0.4615(이미지 실제 비율)로 오버플로우 해소. 실기 검증 대기
 
 ## 다음 할 일 (TODO)
 - [x] **하트 회복 완료 로컬 알림** — Unity `com.unity.mobile.notifications` 2.4.3 도입. NotificationHelper.cs로 예약/취소 캡슐화, LivesSystem이 상태 변경 지점 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 RefreshRecoveryNotification 호출. 설정창에 알림 토글 추가(기본 ON). Android Small Icon은 흰 실루엣 하트(NotificationIconTool 에디터 메뉴로 자동 생성). 앱 실행 중 하트 3 도달 시 알림 취소는 의도된 스팸 방지 동작. 실기 검증 완료 2026-07-29
@@ -168,7 +181,7 @@
 - [ ] Level 91, 92, 94, 95, 97, 98 (타임아웃 = 이미 매우 어려움) 유지. 건들지 말 것
 - [ ] **Private DNS 광고 차단 유저 대응 회의** — 일부 유저가 갤럭시 개인 DNS를 광고 차단 서버로 지정해서 AdMob 로드 실패. 앱 레벨에서 우회 불가능. 대응 옵션: (1) 감내 (2) Firestore에 실패율 익명 로깅해 규모 파악 (3) 광고 없이 진행 못 하게 강경 대응 (4) 보상형 광고 병행 (5) 광고 제거 인앱결제. 규모 데이터 없이 3~5 진행은 오버엔지니어링일 수 있음
 - [ ] **iOS Unity Ads Mediation** — Android 통합과 동일하게 iOS 미디에이션 그룹(Interstitial/Rewarded) 생성, Unity Ads Dashboard에 iOS 앱 등록(Game ID/placements), Adapter 임포트 이미 되어있음(Platforms/iOS 폴더 포함). iOSPostBuild.cs의 SKAdNetwork 자동 반영 여부는 실제 Xcode 빌드 후 Info.plist 확인 필요
-- [ ] **디바이스별 UI 대응** — 폰마다 로딩 화면 오버·HUD 위치 편차·게임 보드 크기 편차. AspectRatioFitter(로딩), CanvasScaler(HUD), BoardRenderer.FitCamera(보드) 각각 점검. 참조: [[project-device-ui-adapt]]
+- [ ] **디바이스별 UI 대응 (부분 완료)** — CanvasScaler·HUD 앵커·LoadingPanel aspectRatio는 처리됨(2026-07-29). 남은 것: (a) 실기 검증(갤럭시 S22+/S25/폴더블/아이폰), (b) SettingsButton localScale 2.1757 이상값 정상화(sizeDelta로 조절), (c) Safe Area(펀치홀·노치) 대응 여부 결정, (d) BoardRenderer.FitCamera 극단 비율(폴더블) 대응 검토. 참조: [[project-device-ui-adapt]]
 
 ## 협업 방식 메모
 - 사용자는 Unity 입문자. 한국어로 단계별로 자세히 안내할 것.
