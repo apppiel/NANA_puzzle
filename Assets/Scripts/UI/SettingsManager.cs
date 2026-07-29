@@ -8,9 +8,11 @@ public class SettingsManager : MonoBehaviour
 
   const string SoundKey = "soundOn";
   const string VibrationKey = "vibrationOn";
+  const string NotificationKey = "notificationOn";
 
   public bool SoundOn { get; private set; }
   public bool VibrationOn { get; private set; }
+  public bool NotificationOn { get; private set; }
 
   void Awake()
   {
@@ -21,6 +23,7 @@ public class SettingsManager : MonoBehaviour
     // 저장된 값 불러오기 (없으면 기본값 on)
     SoundOn = PlayerPrefs.GetInt(SoundKey, 1) == 1;
     VibrationOn = PlayerPrefs.GetInt(VibrationKey, 1) == 1;
+    NotificationOn = PlayerPrefs.GetInt(NotificationKey, 1) == 1;
     ApplySound();
   }
 
@@ -38,6 +41,15 @@ public class SettingsManager : MonoBehaviour
     VibrationOn = on;
     PlayerPrefs.SetInt(VibrationKey, on ? 1 : 0);
     PlayerPrefs.Save();
+  }
+
+  // 알림 토글. 켜지면 LivesSystem이 현재 하트 상태 기반으로 재예약, 꺼지면 예약 취소
+  public void SetNotification(bool on)
+  {
+    NotificationOn = on;
+    PlayerPrefs.SetInt(NotificationKey, on ? 1 : 0);
+    PlayerPrefs.Save();
+    if (LivesSystem.Instance != null) LivesSystem.Instance.RefreshRecoveryNotification();
   }
 
   // BoardRenderer 등 다른 스크립트에서 이 함수만 호출하면 설정에 따라 진동 여부가 결정됨

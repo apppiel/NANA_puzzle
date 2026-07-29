@@ -11,6 +11,7 @@ public class SettingsPanel : MonoBehaviour
   VisualElement overlay;
   Toggle soundToggle;
   Toggle vibrationToggle;
+  Toggle notificationToggle;
 
   void Start()
   {
@@ -21,15 +22,18 @@ public class SettingsPanel : MonoBehaviour
     overlay = root.Q<VisualElement>("overlay");
     soundToggle = root.Q<Toggle>("sound-toggle");
     vibrationToggle = root.Q<Toggle>("vibration-toggle");
+    notificationToggle = root.Q<Toggle>("notification-toggle");
     var closeButton = root.Q<Button>("close-button");
 
     // 저장된 설정 값으로 토글 초기화 (체크 = 켜짐)
     soundToggle.value = SettingsManager.Instance.SoundOn;
     vibrationToggle.value = SettingsManager.Instance.VibrationOn;
+    notificationToggle.value = SettingsManager.Instance.NotificationOn;
 
     // 이벤트 연결: RegisterValueChangedCallback = addEventListener("change", ...)과 같음
     soundToggle.RegisterValueChangedCallback(evt => SettingsManager.Instance.SetSound(evt.newValue));
     vibrationToggle.RegisterValueChangedCallback(evt => SettingsManager.Instance.SetVibration(evt.newValue));
+    notificationToggle.RegisterValueChangedCallback(evt => SettingsManager.Instance.SetNotification(evt.newValue));
     closeButton.clicked += Close;
     root.Q<Button>("reset-button").clicked += ResetProgress;
 
@@ -48,6 +52,7 @@ public class SettingsPanel : MonoBehaviour
     // 열 때마다 현재 설정 값으로 동기화
     soundToggle.value = SettingsManager.Instance.SoundOn;
     vibrationToggle.value = SettingsManager.Instance.VibrationOn;
+    notificationToggle.value = SettingsManager.Instance.NotificationOn;
     root.pickingMode = PickingMode.Position;  // 패널 내부 버튼이 터치를 받을 수 있도록 복구
     overlay.style.display = DisplayStyle.Flex;
   }

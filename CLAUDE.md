@@ -42,6 +42,8 @@
 - LivesSystem.cs: 목숨(하트) 시스템. **규칙**: 기본 3(최대 99), 리셋마다 -1, 판 클리어 시 3 미만이면 3으로 리필/3 이상이면 그대로 유지(누적 자원 소모형), 광고 시청 시 +3. **자동 복구**: 3 미만이면 **10분마다 1개씩** 회복(상한 3). `lastLostAt`은 다음 회복 tick의 앵커로 사용되어, tick 발생 시 그만큼 앵커를 앞으로 이동시켜 남은 카운트 유지. 앱을 오래 껐다 켜도 정확히 계산(예: 25분 후 → 2개 회복 + 5분 남은 카운트 유지). **저장**: PlayerPrefs `livesCurrent` + `livesLostAt` 두 키. **UI**: 상단 하트 표시(TMP_Text) + 하트 옆 `recoveryTimerText`(MM:SS, 하트 < 3일 때만 표시) + [+ 목숨 채우기] 버튼(자발적 광고 시청) + 잠금 오버레이(코드로 Canvas 생성, 라운드 스프라이트도 procedural 생성). `TickRecovery` 코루틴이 항상 돌면서 매초 회복 체크·타이머 갱신·잠금 오버레이 자동 해제(하트 0→1로 회복 시 자동 잠금 해제). 로딩 스크린 사라진 뒤에만 오버레이 표시. AdManager.ShowRewardedAd 완주 콜백으로 리필. **Task #7 논의**: 하트 4+ 상태에서 광고 강제 로직은 광고 시청 인센티브 소멸 위험으로 폐기 결정.
 - BackButtonHandler.cs: 안드로이드 뒤로가기 버튼 처리(KeyCode.Escape 매핑, iOS는 자연스레 no-op). 우선순위: (1)자기 팝업 뜸→닫기 (2)강제 업데이트 팝업(UpdatePromptCanvas)→무시 (3)설정창(SettingsPanel.IsOpen)→닫기 (4)그 외(하트 잠금 포함)→종료 확인 팝업. 팝업: 반투명 배경 + 라운드 흰 카드 + [돌아가기]/[종료하기] 버튼(카드/버튼 모두 procedural rounded sprite). sortingOrder 29500(LivesLock 29000보다 위, UpdatePrompt 30000보다 아래). 씬에 빈 GameObject 만들어 부착, 인스펙터의 Settings Panel 슬롯에 SettingsUI 연결.
 - SettingsPanel.cs: BackButtonHandler에서 열림 상태 확인용 `public bool IsOpen` 프로퍼티 노출(`overlay.resolvedStyle.display == Flex`).
+- NotificationHelper.cs: 하트 회복 완료 로컬 알림. `com.unity.mobile.notifications` 2.4.3 사용. 씬에 GameObject 부착. LivesSystem이 상태 변경 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 `Instance.ScheduleHeartFull` / `Cancel` 호출. Android Small Icon은 **투명 배경 + 흰 픽셀만** 인식(컬러/미등록 시 알림 안 뜸). `Assets/Editor/NotificationIconTool.cs`가 흰 하트 실루엣 자동 생성 메뉴 제공. 앱 실행 중 하트 3 도달 시 Cancel은 의도된 스팸 방지 동작(유저가 앱에서 직접 확인 가능하므로).
+- AdMob Mediation: Android 미디에이션 그룹(NANA-Android-Interstitial/Rewarded)에 Unity Ads 소스 붙임. UnityAds Unity Mediation Plugin v3.19.0을 Source zip → 수동 복사 방식으로 임포트(`Assets/GoogleMobileAds/Mediation/UnityAds/`) — GoogleMobileAds 11.2.0이 Assets 방식이라 v3.19.0의 UPM 배포와 의존성 불일치로 UPM 실패. Unity Ads Dashboard 나나박스 Android(Game ID 800107828, Interstitial_Android/Rewarded_Android placement) 세팅. AdMob 콘솔 + Unity Ads Dashboard 양쪽 다 SJ Phone(광고 ID) 테스트 기기 등록. Ad Inspector Single Ad Source Test로 Unity Ads 응답 검증 완료(재고 있음). iOS 미디에이션은 다음 세션.
 
 ## UI Toolkit 구조
 - SettingsUI (GameObject): UIDocument + SettingsPanel.cs. Assets/UI/SettingsPanel.uxml/uss 사용.
@@ -149,9 +151,10 @@
 - [x] LivesSystem 회복 규칙 변경 — 기존 "30분 후 한 번에 3 리필" → "**10분마다 1개씩** 회복(상한 3)". `ApplyAutoRecovery` tick 기반 재작성. 앱 오래 껐다 켜도 정확히 계산됨(elapsed / interval만큼 회복, 앵커 앞으로 이동)
 - [x] LivesSystem 하트 옆 회복 타이머 UI — `recoveryTimerText` 인스펙터 필드 추가, MM:SS 표시. 하트 < 3일 때만 노출. `TickRecovery` 코루틴이 항상 돌며 갱신·잠금 자동 해제
 - [x] BackButtonHandler 신규 — 안드로이드 뒤로가기 → 종료 확인 팝업. 우선순위(자기팝업/UpdateChecker/설정창/그외) 처리. 라운드 카드+버튼. SettingsPanel.IsOpen 프로퍼티 추가로 연동
+- [x] Android Unity Ads Mediation 통합 (2026-07-29) — AdMob 콘솔에 Android Interstitial/Rewarded 미디에이션 그룹 생성 + Unity Ads 소스 매핑. Unity Ads Dashboard 나나박스 프로젝트/placements 확인. UnityAds Mediation Plugin v3.19.0 Source zip에서 `Assets/GoogleMobileAds/Mediation/UnityAds/`로 수동 복사(UPM 방식은 GoogleMobileAds 11.2.0 Assets 방식과 의존성 불일치로 실패). SJ Phone(광고 ID) AdMob·Unity Ads 양쪽 테스트 기기 등록. Ad Inspector Single Ad Source Test에서 Unity Ads 응답 확인. 평상시 mediation에선 AdMob이 eCPM 경쟁으로 이기는 게 자연스러움
 
 ## 다음 할 일 (TODO)
-- [ ] **하트 회복 완료 로컬 알림** — 하트 < 3에서 3 도달 시점에 로컬 알림 예약. Unity `com.unity.mobile.notifications` 패키지 사용(iOS/Android 모두 지원). 앱 종료/백그라운드 상태에서도 OS가 지정 시각에 알림 트레이 표시. 구현 요점: (1)Decrement 시점에 `현재 부족한 하트 × 10분` 후 알림 예약 (2)회복/광고/판 클리어로 3 도달 시 예약 취소 (3)앱 재실행 시 기존 예약 취소 후 상태 재계산해서 재예약 (4)iOS/Android 13+ 알림 권한 요청 필요 (5)알림 문구 예: "하트가 다 찼어요! 다시 시작해볼까요? 🍬"
+- [x] **하트 회복 완료 로컬 알림** — Unity `com.unity.mobile.notifications` 2.4.3 도입. NotificationHelper.cs로 예약/취소 캡슐화, LivesSystem이 상태 변경 지점 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 RefreshRecoveryNotification 호출. 설정창에 알림 토글 추가(기본 ON). Android Small Icon은 흰 실루엣 하트(NotificationIconTool 에디터 메뉴로 자동 생성). 앱 실행 중 하트 3 도달 시 알림 취소는 의도된 스팸 방지 동작. 실기 검증 완료 2026-07-29
 - [ ] AdMob 콘솔 실제 Rewarded 광고 unit 활성화 확인 — 생성 직후 몇 시간 지연 있을 수 있음. `useTestAd=false` + 자기 기기 테스트 기기로 등록해서 실기 검증
 - [ ] Android v1.0.4 빌드 — AdManager 광고 카운트 수정 + UpdateChecker [종료] + 목숨 시스템 + 셔플 그룹 확장 반영. bundleVersion을 1.0.4로 올린 뒤 빌드/배포
 - [ ] Android v1.0.3 실기 재검증 — 스크린 캡처 방지가 처음엔 안 걸림(runOnUiThread + using dispose 이슈). 람다 안 activity 재획득으로 수정 후 재빌드 필요할 수 있음. 최근앱 미리보기가 검게 나오는지 확인.
@@ -160,10 +163,12 @@
 - [ ] 새 레벨 Level_101~110 제작 완료 — 90~100 난이도 수준(8×8 Diamond/Hexagon/Cross). GameManager `levels` 배열에 뒤로 10개 드래그해서 총 110개 등록. LevelSolverWindow로 정답 1~30개 목표
 - [ ] LivesSystem 실기 검증 — 하트 소진 → 잠금 UI → [광고 보기] → 실제 Rewarded 광고 재생 → 완주 → +3 리필. Private DNS 차단 유저 케이스도 확인(30분 대기 동작)
 - [ ] iOS 실기 테스트 — 라이트닝 케이블 준비하거나 TestFlight 업로드로 검증
-- [ ] **Level 90, 93, 96, 99, 100 재설계** — Level Solver Generator 사용, 8×8 shape 위주 (Diamond/Hexagon/Cross). 각각 정답 1~30 목표로 후보 뽑아 채택. 참조: [[project-level-90-100-redesign]]
+- [x] **Level 90, 93, 96, 99, 100 재설계** — Level Solver Generator 사용, 8×8 shape 위주 (Diamond/Hexagon/Cross). 각각 정답 1~30 목표로 후보 뽑아 채택. 참조: [[project-level-90-100-redesign]]
 - [ ] Level 73, 74 실험 변경 처리 — 요구자와 확인 후 유지할지 원복할지 결정. 실기 플레이해서 어려운지 검증 후 판단 권장
 - [ ] Level 91, 92, 94, 95, 97, 98 (타임아웃 = 이미 매우 어려움) 유지. 건들지 말 것
 - [ ] **Private DNS 광고 차단 유저 대응 회의** — 일부 유저가 갤럭시 개인 DNS를 광고 차단 서버로 지정해서 AdMob 로드 실패. 앱 레벨에서 우회 불가능. 대응 옵션: (1) 감내 (2) Firestore에 실패율 익명 로깅해 규모 파악 (3) 광고 없이 진행 못 하게 강경 대응 (4) 보상형 광고 병행 (5) 광고 제거 인앱결제. 규모 데이터 없이 3~5 진행은 오버엔지니어링일 수 있음
+- [ ] **iOS Unity Ads Mediation** — Android 통합과 동일하게 iOS 미디에이션 그룹(Interstitial/Rewarded) 생성, Unity Ads Dashboard에 iOS 앱 등록(Game ID/placements), Adapter 임포트 이미 되어있음(Platforms/iOS 폴더 포함). iOSPostBuild.cs의 SKAdNetwork 자동 반영 여부는 실제 Xcode 빌드 후 Info.plist 확인 필요
+- [ ] **디바이스별 UI 대응** — 폰마다 로딩 화면 오버·HUD 위치 편차·게임 보드 크기 편차. AspectRatioFitter(로딩), CanvasScaler(HUD), BoardRenderer.FitCamera(보드) 각각 점검. 참조: [[project-device-ui-adapt]]
 
 ## 협업 방식 메모
 - 사용자는 Unity 입문자. 한국어로 단계별로 자세히 안내할 것.

@@ -12,6 +12,8 @@ using TMPro;
 // - 자동 복구: 3 미만이면 10분마다 1개씩 회복 (상한 3). 하트 옆 recoveryTimerText에 다음 회복까지 MM:SS 표시.
 public class LivesSystem : MonoBehaviour
 {
+  public static LivesSystem Instance { get; private set; }
+
   [Header("연결")]
   public AdManager adManager;          // 보상형 광고 호출
   public TMP_Text livesText;           // 상단 "x3" 표시. 없어도 동작함
@@ -40,12 +42,18 @@ public class LivesSystem : MonoBehaviour
   Canvas overlayCanvas;
   Text statusText;   // 팝업 안 상태 메시지("광고 준비 중..." 등)
 
+  void Awake()
+  {
+    Instance = this;
+  }
+
   IEnumerator Start()
   {
     LoadState();
     ApplyAutoRecovery();
     UpdateHudText();
     UpdateRecoveryTimerText();
+    RefreshRecoveryNotification();
 
     // 라운드 스프라이트 자동 생성 (팝업 카드·버튼 배경에서 재사용)
     roundedSprite = BuildRoundedSprite(64, 16);
@@ -156,6 +164,7 @@ public class LivesSystem : MonoBehaviour
     SaveState();
     UpdateHudText();
     UpdateRecoveryTimerText();
+    RefreshRecoveryNotification();
     if (current <= 0) ShowLockOverlay();
   }
 
@@ -169,6 +178,7 @@ public class LivesSystem : MonoBehaviour
       SaveState();
       UpdateHudText();
       UpdateRecoveryTimerText();
+      RefreshRecoveryNotification();
       HideLockOverlay();
     }
     // else: current 그대로 유지 (누적 자원은 소모형)
@@ -182,6 +192,7 @@ public class LivesSystem : MonoBehaviour
     SaveState();
     UpdateHudText();
     UpdateRecoveryTimerText();
+    RefreshRecoveryNotification();
     HideLockOverlay();
   }
 
@@ -272,11 +283,31 @@ public class LivesSystem : MonoBehaviour
     {
       int prev = current;
       ApplyAutoRecovery();
-      if (current != prev) UpdateHudText();
+      if (current != prev)
+      {
+        UpdateHudText();
+        RefreshRecoveryNotification();
+      }
       UpdateRecoveryTimerText();
       if (current > 0 && overlayCanvas != null) HideLockOverlay();
       yield return wait;
     }
+  }
+
+  // 하트 회복 완료 시각을 계산해서 알림 예약. 상태가 바뀔 때마다 호출됨.
+  // 설정 토글 OFF, 이미 가득참, 앵커 없음 중 하나면 취소만.
+  public void RefreshRecoveryNotification()
+  {
+    if (NotificationHelper.Instance == null) return;
+    bool enabled = SettingsManager.Instance == null || SettingsManager.Instance.NotificationOn;
+    if (!enabled || current >= BaseLives || lastLostAt <= 0)
+    {
+      NotificationHelper.Instance.Cancel();
+      return;
+    }
+    long fullAtMs = lastLostAt + (long)(BaseLives - current) * RecoverIntervalMs;
+    var fullAt = DateTimeOffset.FromUnixTimeMilliseconds(fullAtMs).LocalDateTime;
+    NotificationHelper.Instance.ScheduleHeartFull(fullAt);
   }
 
   void UpdateRecoveryTimerText()
