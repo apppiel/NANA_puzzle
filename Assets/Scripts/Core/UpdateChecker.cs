@@ -21,16 +21,32 @@ public class UpdateChecker : MonoBehaviour
     // 에디터에서는 개발 편의를 위해 업데이트 체크 스킵
     return;
 #else
+    TryCheck();
+#endif
+  }
+
+  // 백그라운드 → 포그라운드 복귀 시 재시도. 첫 시도가 오프라인이었어도 이후 온라인 되면 잡을 수 있음.
+  void OnApplicationPause(bool paused)
+  {
+#if !UNITY_EDITOR
+    if (!paused && overlayCanvas == null) TryCheck();
+#endif
+  }
+
+  // Firebase 초기화 또는 Firestore 조회 실패 시 30초 후 재시도. 중복 예약 방지 위해 CancelInvoke 선행.
+  void TryCheck()
+  {
+    CancelInvoke(nameof(TryCheck));
     FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
     {
       if (task.Result != DependencyStatus.Available)
       {
-        Debug.LogWarning("[UpdateChecker] Firebase 초기화 실패: " + task.Result);
+        Debug.LogWarning("[UpdateChecker] Firebase 초기화 실패, 30초 후 재시도: " + task.Result);
+        Invoke(nameof(TryCheck), 30f);
         return;
       }
       CheckLatestVersion();
     });
-#endif
   }
 
   void CheckLatestVersion()
@@ -38,7 +54,13 @@ public class UpdateChecker : MonoBehaviour
     var db = FirebaseFirestore.DefaultInstance;
     db.Document(ConfigPath).GetSnapshotAsync().ContinueWithOnMainThread(task =>
     {
-      if (!task.IsCompletedSuccessfully || !task.Result.Exists) return;
+      if (!task.IsCompletedSuccessfully)
+      {
+        Debug.LogWarning("[UpdateChecker] config/app_version 조회 실패, 30초 후 재시도");
+        Invoke(nameof(TryCheck), 30f);
+        return;
+      }
+      if (!task.Result.Exists) return;
 
 #if UNITY_ANDROID
       const string field = "androidLatestVersion";

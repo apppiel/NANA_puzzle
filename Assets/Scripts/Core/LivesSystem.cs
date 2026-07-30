@@ -143,6 +143,19 @@ public class LivesSystem : MonoBehaviour
     // else: current 그대로 유지 (누적 자원은 소모형)
   }
 
+  // GameManager.ResetAndRestart에서 호출. 최소 하트 3 보장(0 상태로 리셋되어 즉시 잠금 상태 방지).
+  // 광고로 쌓인 여분(4+)은 그대로 보존.
+  public void RefillOnReset()
+  {
+    if (current < BaseLives) current = BaseLives;
+    lastLostAt = 0;
+    SaveState();
+    UpdateHudText();
+    UpdateRecoveryTimerText();
+    RefreshRecoveryNotification();
+    HideLockOverlay();
+  }
+
   // 광고 시청 완료 시 실행되는 콜백. 그냥 +3 (99 상한). max 개념 없음.
   void ApplyRewardedAdReward()
   {

@@ -70,6 +70,10 @@ public class GameManager : MonoBehaviour
   {
 #if UNITY_ANDROID && !UNITY_EDITOR
     long currentInstallTime = GetFirstInstallTime();
+    // API 예외로 -1 리턴된 경우 진단 불가로 판단하고 스킵.
+    // 저장된 기본값("0")과 우연 매치되어 재설치 감지 놓치는 사고 방지.
+    if (currentInstallTime < 0) return;
+
     long storedInstallTime  = long.Parse(PlayerPrefs.GetString("installTime", "0"));
 
     if (currentInstallTime != storedInstallTime)
@@ -96,7 +100,7 @@ public class GameManager : MonoBehaviour
     catch (System.Exception e)
     {
       Debug.LogWarning("firstInstallTime 조회 실패: " + e.Message);
-      return 0L;
+      return -1L;   // 실패 시 -1: ClearPrefsIfReinstalled가 스킵하도록 유도 (안전 fallback)
     }
   }
 #endif
@@ -140,8 +144,25 @@ public class GameManager : MonoBehaviour
   {
     if (levels == null || levels.Length == 0) return;
     int idx = PickNextIndex();
-    if (idx < 0) return;
+    // 방어: 그룹 안 모든 판이 cleared[]=true인데 clearedCount는 그룹 경계 아래인 손상 상태.
+    // 그대로 두면 게임 화면이 검게 정지. clearedCount를 다음 그룹 시작으로 승격시켜 복구.
+    while (idx < 0)
+    {
+      int next = NextGroupStart(clearedCount);
+      if (next == clearedCount) return;   // 이미 마지막 그룹까지 소진 = 실제 완주 상황
+      clearedCount = next;
+      SaveProgress();
+      idx = PickNextIndex();
+    }
     LoadLevel(idx);
+  }
+
+  // clearedCount가 속한 그룹의 "다음 그룹" 시작 값 반환. 이미 마지막이면 원래값 그대로.
+  int NextGroupStart(int count)
+  {
+    for (int g = 1; g < GroupBoundaries.Length; g++)
+      if (count < GroupBoundaries[g]) return GroupBoundaries[g];
+    return count;
   }
 
   int PickNextIndex()
@@ -255,14 +276,17 @@ public class GameManager : MonoBehaviour
   // 설정창 "처음부터 시작" → 저장된 진행 상황을 지우고 새로 시작
   public void ResetAndRestart()
   {
-    PlayerPrefs.DeleteKey(LegacyProgressKey);
-    PlayerPrefs.DeleteKey(ClearedCountKey);
-    PlayerPrefs.DeleteKey(ClearedMaskKey);
-    PlayerPrefs.Save();
-
     if (cleared != null)
       for (int i = 0; i < cleared.Length; i++) cleared[i] = false;
     clearedCount = 0;
+    // DeleteKey 대신 SaveProgress로 명시적 0 저장. 저장 실패/지연 리스크 회피 + LoadProgress가 legacy fallback 안 타게 함.
+    SaveProgress();
+    PlayerPrefs.DeleteKey(LegacyProgressKey);   // legacy는 재도 필요없으므로 삭제
+    PlayerPrefs.Save();
+
+    // UX: 하트 최소 3 보장. 광고로 쌓인 여분(4+)은 보존.
+    if (livesSystem != null) livesSystem.RefillOnReset();
+
     PickAndLoadNext();
   }
 }
