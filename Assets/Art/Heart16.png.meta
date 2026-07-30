@@ -1,10 +1,14 @@
 fileFormatVersion: 2
-guid: f991331f0c4b24fc1ad4d7d7279f771d
+guid: a2cf291cad8821f4f97e3042c1a702a8
+AssetOrigin:
+  serializedVersion: 1
+  productId: 287862
+  packageName: Heart in pixel
+  packageVersion: 1.0
+  assetPath: Assets/MR3_2004/heart/Heart16.png
+  uploadId: 671617
 TextureImporter:
-  internalIDToNameTable:
-  - first:
-      213: 3907721248601932646
-    second: GameTitle_0
+  internalIDToNameTable: []
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,7 +50,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 2
+  spriteMode: 1
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -137,34 +141,12 @@ TextureImporter:
     forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
-    sprites:
-    - serializedVersion: 2
-      name: GameTitle_0
-      rect:
-        serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1080
-        height: 2340
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 6630a2885c30b3630800000000000000
-      internalID: 3907721248601932646
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
+    sprites: []
     outline: []
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 5e97eb03825dee720800000000000000
     internalID: 0
     vertices: []
     indices: 
@@ -173,8 +155,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      GameTitle_0: 3907721248601932646
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

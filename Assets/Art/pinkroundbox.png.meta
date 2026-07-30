@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: f991331f0c4b24fc1ad4d7d7279f771d
+guid: da37ac70b0f2745aaa97e54363bf0f76
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3907721248601932646
-    second: GameTitle_0
+      213: -3193217681908826185
+    second: pinkroundbox_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -139,13 +139,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: GameTitle_0
+      name: pinkroundbox_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1080
-        height: 2340
+        x: 220
+        y: 305
+        width: 370
+        height: 189
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -154,8 +154,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 6630a2885c30b3630800000000000000
-      internalID: 3907721248601932646
+      spriteID: 7bff35bcf696fa3d0800000000000000
+      internalID: -3193217681908826185
       vertices: []
       indices: 
       edges: []
@@ -174,7 +174,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      GameTitle_0: 3907721248601932646
+      pinkroundbox_0: -3193217681908826185
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
