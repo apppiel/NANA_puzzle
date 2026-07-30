@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>경품 신청 - Nanabox</title>
+  <meta name="description" content="NANA 퍼즐 100레벨 클리어 경품 신청 페이지">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pink:       #FF8A8A;
+      --pink-light: #FFC2C2;
+      --pink-bg:    #FFF0F0;
+      --bg:         #FAFAF8;
+      --card:       #FFFFFF;
+      --text:       #1A1A1A;
+      --muted:      #9a7878;
+      --border:     rgba(0,0,0,0.08);
+      --border-pink: rgba(255,138,138,0.3);
+      --radius:     16px;
+    }
+
+    /* 스킵 내비게이션 (키보드 사용자용) */
+    .skip-link {
+      position: absolute;
+      top: -999px;
+      left: 0;
+      background: var(--pink);
+      color: #fff;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      z-index: 9999;
+      border-radius: 0 0 8px 0;
+    }
+    .skip-link:focus { top: 0; }
+
+    body {
+      font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { font-size: 0; line-height: 0; } /* 카페24가 주입하는 &nbsp; 텍스트 노드 숨김 */
+    .logo img { height: 60px; width: auto; display: block; }
+    header a.back-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+    }
+    header a.back-link:hover { color: var(--text); }
+
+    /* ── MAIN ── */
+    main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 48px 24px 80px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    /* ── 타이틀 ── */
+    .page-badge {
+      display: inline-block;
+      background: rgba(255,138,138,0.12);
+      border: 1px solid var(--border-pink);
+      color: var(--pink);
+      font-size: 0.78rem;
+      padding: 4px 14px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      letter-spacing: 0.04em;
+    }
+    .card-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+    .card-desc {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 32px;
+    }
+
+    /* ── 단계 표시 ── */
+    .steps {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 32px;
+    }
+    .step-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255,138,138,0.2);
+      transition: background 0.3s, width 0.3s;
+    }
+    .step-dot.active {
+      background: var(--pink);
+      width: 20px;
+      border-radius: 999px;
+    }
+    /* 스크린 리더용 단계 안내 */
+    .step-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+
+    /* ── 폼 요소 ── */
+    .field { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.02em;
+    }
+    label .required {
+      color: var(--pink);
+      margin-left: 2px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      color: var(--text);
+      background: var(--card);
+    }
+    input:focus {
+      border-color: var(--pink);
+      box-shadow: 0 0 0 3px rgba(255,138,138,0.15);
+    }
+    input::placeholder { color: #ccc; }
+
+    /* 코드 입력 특수 스타일 */
+    #code-input {
+      text-align: center;
+      letter-spacing: 6px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--pink);
+      text-transform: uppercase;
+      padding: 16px;
+    }
+
+    /* ── 상태 메시지 ── */
+    .status-msg {
+      font-size: 0.82rem;
+      min-height: 18px;
+      margin-top: 8px;
+    }
+    .status-msg:empty { display: none; }
+    .status-msg.error { color: #d94040; }
+    .status-msg.ok    { color: #27a060; }
+    .status-msg.info  { color: var(--muted); }
+
+    /* ── 버튼 ── */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-top: 24px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--pink), #e06060);
+      color: #FAFAF8;
+    }
+    .btn-primary:hover  { opacity: 0.88; }
+    .btn-primary:focus-visible {
+      outline: 3px solid var(--pink);
+      outline-offset: 3px;
+    }
+    .btn-primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ── 인포 박스 ── */
+    .info-box {
+      background: var(--pink-bg);
+      border: 1px solid var(--border-pink);
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+
+    /* ── 구분선 ── */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 28px 0;
+    }
+
+    /* ── 성공 화면 ── */
+    .success-icon {
+      font-size: 52px;
+      text-align: center;
+      margin-bottom: 16px;
+      /* 이모지 애니메이션 */
+      animation: pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes pop {
+      0%   { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+    .success-title {
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .success-desc {
+      text-align: center;
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+    .success-desc a {
+      color: var(--pink);
+      text-decoration: none;
+      border-bottom: 1px solid var(--border-pink);
+    }
+    .success-desc a:hover { border-color: var(--pink); }
+
+    /* ── 유틸 ── */
+    .hidden { display: none !important; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+    }
+    .footer-inner {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    footer .copy { color: var(--muted); font-size: 0.82rem; }
+    footer a { color: var(--muted); text-decoration: none; font-size: 0.82rem; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 520px) {
+      .card { padding: 32px 20px; }
+      .footer-inner { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <a class="skip-link" href="#main-content">본문으로 바로가기</a>
+
+  <header>
+    <a class="logo" href="https://nanabox.co.kr" aria-label="Nanabox 홈으로"><img
+        src="//ecimg.cafe24img.com/pg2489b47375476066/nanabox79/web/upload/category/editor/2026/07/04/343a1eb916cc7a2e9588acd15d3c8606.png"
+        alt="Nanabox"
+      /></a>
+    <a class="back-link" href="https://nanabox.co.kr">← 홈으로</a>
+  </header>
+
+  <main id="main-content">
+    <div class="card" role="region" aria-label="경품 신청">
+
+      <div class="page-badge" aria-hidden="true">🎉 100레벨 클리어</div>
+      <h1 class="card-title">경품 신청</h1>
+      <p class="card-desc">인증 코드와 배송 주소를 입력해 주세요.</p>
+
+      <!-- 단계 표시 -->
+      <div
+        class="steps"
+        role="progressbar"
+        aria-valuemin="1"
+        aria-valuemax="3"
+        aria-valuenow="1"
+        aria-label="신청 진행 단계"
+        id="step-progress"
+      >
+        <div class="step-dot active" id="dot-1" aria-hidden="true"></div>
+        <div class="step-dot"        id="dot-2" aria-hidden="true"></div>
+        <div class="step-dot"        id="dot-3" aria-hidden="true"></div>
+        <span class="step-label" id="step-label" aria-live="polite">1단계 / 3: 코드 확인</span>
+      </div>
+
+      <!-- ── STEP 1: 코드 입력 ── -->
+      <section id="step-1" aria-labelledby="step1-heading">
+        <h2 id="step1-heading" class="hidden">인증 코드 확인</h2>
+
+        <div class="info-box" role="note">
+          게임 내 팝업에서 표시된 <strong>인증 코드</strong>를 입력해 주세요.<br>
+          형식 예시: <strong>A3K9-XZ21</strong>
+        </div>
+
+        <div class="field">
+          <label for="code-input">
+            인증 코드 <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="code-input"
+            type="text"
+            inputmode="text"
+            maxlength="9"
+            placeholder="A3K9-XZ21"
+            autocomplete="off"
+            spellcheck="false"
+            aria-required="true"
+            aria-describedby="code-status"
+          />
+          <!-- aria-live="assertive" 로 에러는 즉시 읽힘 -->
+          <div
+            class="status-msg"
+            id="code-status"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          ></div>
+        </div>
+
+        <button
+          class="btn btn-primary"
+          id="verify-btn"
+          onclick="verifyCode()"
+          aria-label="코드 확인하기"
+        >
+          코드 확인
+        </button>
+      </section>
+
+      <!-- ── STEP 2: 주소 입력 ── -->
+      <section id="step-2" class="hidden" aria-labelledby="step2-heading">
+        <h2 id="step2-heading" class="hidden">배송 주소 입력</h2>
+
+        <div class="info-box" role="status" aria-live="polite">
+          코드가 확인되었습니다 ✅<br>
+          배송 받으실 주소를 입력해 주세요.
+        </div>
+
+        <div class="field">
+          <label for="name-input">
+            이름 <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="name-input"
+            type="text"
+            placeholder="홍길동"
+            autocomplete="name"
+            aria-required="true"
+          />
+        </div>
+
+        <div class="field">
+          <label for="phone-input">
+            연락처 <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="phone-input"
+            type="tel"
+            placeholder="010-0000-0000"
+            autocomplete="tel"
+            aria-required="true"
+          />
+        </div>
+
+        <div class="field">
+          <label for="zip-input">
+            우편번호 <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="zip-input"
+            type="text"
+            inputmode="numeric"
+            placeholder="12345"
+            maxlength="5"
+            autocomplete="postal-code"
+            aria-required="true"
+          />
+        </div>
+
+        <div class="field">
+          <label for="addr-input">
+            주소 <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input
+            id="addr-input"
+            type="text"
+            placeholder="서울시 강남구 테헤란로 123"
+            autocomplete="street-address"
+            aria-required="true"
+          />
+        </div>
+
+        <div class="field">
+          <label for="addr-detail-input">상세 주소</label>
+          <input
+            id="addr-detail-input"
+            type="text"
+            placeholder="○○아파트 101동 202호"
+            autocomplete="address-line2"
+          />
+        </div>
+
+        <div
+          class="status-msg"
+          id="addr-status"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        ></div>
+
+        <button
+          class="btn btn-primary"
+          id="submit-btn"
+          onclick="submitAddress()"
+          aria-label="경품 신청 완료"
+        >
+          신청 완료
+        </button>
+      </section>
+
+      <!-- ── STEP 3: 완료 ── -->
+      <section id="step-3" class="hidden" aria-labelledby="step3-heading" aria-live="polite">
+        <h2 id="step3-heading" class="hidden">신청 완료</h2>
+        <div class="success-icon" aria-hidden="true">🎉</div>
+        <p class="success-title">신청이 완료되었습니다!</p>
+        <hr />
+        <p class="success-desc">
+          입력하신 주소로 순차 배송될 예정입니다.<br><br>
+          문의: <a href="mailto:nanabox79@gmail.com">nanabox79@gmail.com</a>
+        </p>
+      </section>
+
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span class="copy">© 2026 Nanabox. All rights reserved.</span>
+      <a href="privacy.html">개인정보처리방침</a>
+    </div>
+  </footer>
+
+<!-- ── Firebase JS SDK ── -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // ─────────────────────────────────────────────────────────
+  // 게임별로 Firebase 프로젝트가 분리돼 있어서 두 프로젝트를 동시에 초기화한다.
+  // 코드 조회 시 두 곳 모두 병렬로 확인 → 발견된 쪽 DB를 이 신청 세션에 사용.
+  //   - nana-53f2e : NO.1 (NANA_puzzle)
+  //   - nana-no2   : NO.2 (WaterSortPuzzle)
+  // ─────────────────────────────────────────────────────────
+  const nana1Config = {
+    apiKey:            "AIzaSyB6jbnv_awGKlkAjoanNEch944gs258sIg",
+    authDomain:        "nana-53f2e.firebaseapp.com",
+    projectId:         "nana-53f2e",
+    storageBucket:     "nana-53f2e.firebasestorage.app",
+    messagingSenderId: "129523993912",
+    appId:             "1:129523993912:web:6b1d3d8e9c219fd06405cd",
+  };
+  const nana2Config = {
+    apiKey:            "AIzaSyB4no7OMAeZW9D4v0f3SIjPW5s-FDjHe3k",
+    authDomain:        "nana-no2.firebaseapp.com",
+    projectId:         "nana-no2",
+    storageBucket:     "nana-no2.firebasestorage.app",
+    messagingSenderId: "776593584361",
+    appId:             "1:776593584361:web:1168e3fb680322d1110078",
+  };
+
+  // named app 으로 두 프로젝트를 동시에 관리 (default 앱 이름 충돌 방지)
+  const db1 = getFirestore(initializeApp(nana1Config, "nana1"));
+  const db2 = getFirestore(initializeApp(nana2Config, "nana2"));
+
+  let verifiedCode = "";
+  let activeDb     = null;   // 코드 검증 시 발견된 쪽 DB (nana1 or nana2). 이후 claims 는 여기 저장.
+  let activeGame   = "";     // "NO.1" or "NO.2" — 필요 시 디버깅/추후 UI 표시용
+
+  // ── 코드 검증 ──
+  window.verifyCode = async function () {
+    const raw    = document.getElementById("code-input").value.trim().toUpperCase();
+    const status = document.getElementById("code-status");
+    const btn    = document.getElementById("verify-btn");
+
+    // 형식 검사: 4자 + 하이픈 + 4자
+    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(raw)) {
+      setStatus(status, "코드 형식이 올바르지 않습니다 (예: A3K9-XZ21)", "error");
+      return;
+    }
+
+    btn.disabled = true;
+    setStatus(status, "확인 중...", "info");
+
+    try {
+      // 두 프로젝트를 동시에 조회 (parallel → 총 지연 = max(t1, t2), 아니라 sum)
+      const [snap1, snap2] = await Promise.all([
+        getDoc(doc(db1, "code_index", raw)),
+        getDoc(doc(db2, "code_index", raw)),
+      ]);
+
+      // 어느 프로젝트에서 발견됐는지 판정. 이론적으론 두 곳 다 있을 수 없음
+      // (코드 발급 시 각 게임별로 자기 DB에만 저장하므로).
+      if (snap1.exists()) {
+        activeDb   = db1;
+        activeGame = "NO.1";
+      } else if (snap2.exists()) {
+        activeDb   = db2;
+        activeGame = "NO.2";
+      } else {
+        setStatus(status, "유효하지 않은 코드입니다.", "error");
+        btn.disabled = false;
+        return;
+      }
+
+      // claims 에서 중복 신청 확인 (발견된 쪽 DB 에서만)
+      const claimSnap = await getDoc(doc(activeDb, "claims", raw));
+      if (claimSnap.exists()) {
+        setStatus(status, "이미 사용된 코드입니다.", "error");
+        btn.disabled = false;
+        return;
+      }
+
+      verifiedCode = raw;
+      goToStep(2);
+
+    } catch (e) {
+      console.error(e);
+      setStatus(status, "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", "error");
+      btn.disabled = false;
+    }
+  };
+
+  // ── 주소 제출 ──
+  window.submitAddress = async function () {
+    const name   = document.getElementById("name-input").value.trim();
+    const phone  = document.getElementById("phone-input").value.trim();
+    const zip    = document.getElementById("zip-input").value.trim();
+    const addr   = document.getElementById("addr-input").value.trim();
+    const detail = document.getElementById("addr-detail-input").value.trim();
+    const status = document.getElementById("addr-status");
+    const btn    = document.getElementById("submit-btn");
+
+    if (!name || !phone || !zip || !addr) {
+      setStatus(status, "이름, 연락처, 우편번호, 주소는 필수 입력 항목입니다.", "error");
+      return;
+    }
+
+    btn.disabled = true;
+    setStatus(status, "제출 중...", "info");
+
+    try {
+      // verifyCode 에서 결정된 activeDb 에 저장 (코드가 발급된 게임의 프로젝트)
+      await setDoc(doc(activeDb, "claims", verifiedCode), {
+        code:          verifiedCode,
+        game:          activeGame,   // "NO.1" or "NO.2" — 어느 게임에서 발급됐는지 명시
+        name:          name,
+        phone:         phone,
+        zipcode:       zip,
+        address:       addr,
+        addressDetail: detail,
+        submittedAt:   serverTimestamp(),
+      });
+      goToStep(3);
+
+    } catch (e) {
+      console.error(e);
+      setStatus(status, "제출 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", "error");
+      btn.disabled = false;
+    }
+  };
+
+  // ── 단계 전환 ──
+  function goToStep(n) {
+    ["step-1","step-2","step-3"].forEach(id =>
+      document.getElementById(id).classList.add("hidden")
+    );
+    document.getElementById(`step-${n}`).classList.remove("hidden");
+
+    // 단계 점 & 진행바 업데이트
+    for (let i = 1; i <= 3; i++) {
+      document.getElementById(`dot-${i}`).classList.toggle("active", i <= n);
+    }
+    const progress = document.getElementById("step-progress");
+    progress.setAttribute("aria-valuenow", n);
+
+    const labels = ["", "1단계 / 3: 코드 확인", "2단계 / 3: 주소 입력", "3단계 / 3: 신청 완료"];
+    document.getElementById("step-label").textContent = labels[n];
+
+    // 단계 전환 시 첫 입력 필드로 포커스 이동
+    if (n === 2) {
+      setTimeout(() => document.getElementById("name-input").focus(), 50);
+    }
+    if (n === 3) {
+      setTimeout(() => document.getElementById("step-3").querySelector("p").focus(), 50);
+      document.getElementById("step-3").querySelector("p").setAttribute("tabindex", "-1");
+    }
+  }
+
+  // ── 상태 메시지 ──
+  function setStatus(el, msg, type) {
+    el.textContent = msg;
+    el.className = `status-msg ${type}`;
+  }
+
+  // ── 코드 입력: 자동 하이픈 & 대문자 변환 ──
+  document.getElementById("code-input").addEventListener("input", function (e) {
+    const cursor = e.target.selectionStart;
+    let v = e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 8);
+    if (v.length > 4) v = v.slice(0, 4) + "-" + v.slice(4);
+    e.target.value = v;
+    // 하이픈 삽입 후 커서 위치 보정
+    const newCursor = cursor <= 4 ? cursor : cursor + 1;
+    e.target.setSelectionRange(newCursor, newCursor);
+  });
+
+  // ── 엔터로 코드 확인 ──
+  document.getElementById("code-input").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); window.verifyCode(); }
+  });
+</script>
+</body>
+</html>
