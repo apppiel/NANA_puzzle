@@ -181,16 +181,8 @@
 - [x] **하트 회복 완료 로컬 알림** — Unity `com.unity.mobile.notifications` 2.4.3 도입. NotificationHelper.cs로 예약/취소 캡슐화, LivesSystem이 상태 변경 지점 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 RefreshRecoveryNotification 호출. 설정창에 알림 토글 추가(기본 ON). Android Small Icon은 흰 실루엣 하트(NotificationIconTool 에디터 메뉴로 자동 생성). 앱 실행 중 하트 3 도달 시 알림 취소는 의도된 스팸 방지 동작. 실기 검증 완료 2026-07-29
 - [ ] AdMob 콘솔 실제 Rewarded 광고 unit 활성화 확인 — 생성 직후 몇 시간 지연 있을 수 있음. `useTestAd=false` + 자기 기기 테스트 기기로 등록해서 실기 검증
 - [ ] Android v1.0.4 빌드 — AdManager 광고 카운트 수정 + UpdateChecker [종료] + 목숨 시스템 + 셔플 그룹 확장 반영. bundleVersion을 1.0.4로 올린 뒤 빌드/배포
-- [ ] Android v1.0.3 실기 재검증 — 스크린 캡처 방지가 처음엔 안 걸림(runOnUiThread + using dispose 이슈). 람다 안 activity 재획득으로 수정 후 재빌드 필요할 수 있음. 최근앱 미리보기가 검게 나오는지 확인.
 - [ ] v1.0.4 배포 후 [종료] 실기 검증 — 팝업에서 [종료] 탭 시 앱 프로세스 완전 종료(최근 앱 목록에서도 사라짐) → 재실행 시 팝업 재표시 확인
 - [ ] iOS v1.0.2 빌드 & App Store 제출 — code_index 저장 로직 + **activeInputHandler=Both 복구** + 랜덤 셔플 + 캡처 방지 + 강제 업데이트 + AdManager 광고 카운트 수정 + UpdateChecker [종료] + 목숨 시스템 + 셔플 그룹 확장 반영. iOS에서 Application.Quit이 심사에 문제되는지 리젝 사례 사전 조사 권장
-- [ ] 새 레벨 Level_101~110 제작 완료 — 90~100 난이도 수준(8×8 Diamond/Hexagon/Cross). GameManager `levels` 배열에 뒤로 10개 드래그해서 총 110개 등록. LevelSolverWindow로 정답 1~30개 목표
-- [ ] LivesSystem 실기 검증 — 하트 소진 → 잠금 UI → [광고 보기] → 실제 Rewarded 광고 재생 → 완주 → +3 리필. Private DNS 차단 유저 케이스도 확인(30분 대기 동작)
-- [ ] iOS 실기 테스트 — 라이트닝 케이블 준비하거나 TestFlight 업로드로 검증
-- [x] **Level 90, 93, 96, 99, 100 재설계** — Level Solver Generator 사용, 8×8 shape 위주 (Diamond/Hexagon/Cross). 각각 정답 1~30 목표로 후보 뽑아 채택. 참조: [[project-level-90-100-redesign]]
-- [ ] Level 73, 74 실험 변경 처리 — 요구자와 확인 후 유지할지 원복할지 결정. 실기 플레이해서 어려운지 검증 후 판단 권장
-- [ ] Level 91, 92, 94, 95, 97, 98 (타임아웃 = 이미 매우 어려움) 유지. 건들지 말 것
-- [ ] **Private DNS 광고 차단 유저 대응 회의** — 일부 유저가 갤럭시 개인 DNS를 광고 차단 서버로 지정해서 AdMob 로드 실패. 앱 레벨에서 우회 불가능. 대응 옵션: (1) 감내 (2) Firestore에 실패율 익명 로깅해 규모 파악 (3) 광고 없이 진행 못 하게 강경 대응 (4) 보상형 광고 병행 (5) 광고 제거 인앱결제. 규모 데이터 없이 3~5 진행은 오버엔지니어링일 수 있음
 - [ ] **iOS Unity Ads Mediation** — Android 통합과 동일하게 iOS 미디에이션 그룹(Interstitial/Rewarded) 생성, Unity Ads Dashboard에 iOS 앱 등록(Game ID/placements), Adapter 임포트 이미 되어있음(Platforms/iOS 폴더 포함). iOSPostBuild.cs의 SKAdNetwork 자동 반영 여부는 실제 Xcode 빌드 후 Info.plist 확인 필요
 - [ ] **디바이스별 UI 대응 (부분 완료)** — CanvasScaler·HUD 앵커·LoadingPanel aspectRatio는 처리됨(2026-07-29). 남은 것: (a) 실기 검증(갤럭시 S22+/S25/폴더블/아이폰), (b) SettingsButton localScale 2.1757 이상값 정상화(sizeDelta로 조절), (c) Safe Area(펀치홀·노치) 대응 여부 결정, (d) BoardRenderer.FitCamera 극단 비율(폴더블) 대응 검토. 참조: [[project-device-ui-adapt]]
 
@@ -200,10 +192,4 @@
 - 단순 편집은 사용자, 여러 파일에 걸친 코드 작업은 Claude Code가 담당.
 - 커밋은 의미 있는 체크포인트마다.
 - 코드마다 필요하다고 생각되는 부분에 이해하기 쉽게 추가적인 주석 달아줄 것.
-
-# 공통 행동 지침
-
-LLM의 흔한 코딩 실수를 줄이기 위한 행동 지침. 프로젝트 지침과 함께 사용.
-
-**트레이드오프:** 이 지침은 속도보다 신중함을 우선시함. 사소한 작업은 상황에 맞게 판단할 것.
 
