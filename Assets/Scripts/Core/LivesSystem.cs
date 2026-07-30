@@ -14,15 +14,17 @@ public class LivesSystem : MonoBehaviour
 {
   public static LivesSystem Instance { get; private set; }
 
-  [Header("연결")]
+  [Header("HUD")]
   public AdManager adManager;          // 보상형 광고 호출
   public TMP_Text livesText;           // 상단 "x3" 표시. 없어도 동작함
   public TMP_Text recoveryTimerText;   // 하트 옆 다음 회복까지 카운트다운(MM:SS). 3 미만일 때만 표시. 없어도 동작함
-  public Button fillButton;          // "+ 목숨 채우기" 버튼. 없어도 동작함
+  public Button fillButton;            // "+ 목숨 채우기" 버튼. 없어도 동작함
   public LoadingScreen loadingScreen;  // 로딩 끝나기 전까지 잠금 팝업 표시를 지연. 미연결 시 즉시 표시
 
-  // 카드·버튼 배경용 라운드 스프라이트. Start()에서 procedural로 자동 생성. 인스펙터 세팅 불필요.
-  Sprite roundedSprite;
+  [Header("잠금 팝업 (씬에 만들어둔 UI 연결)")]
+  [SerializeField] GameObject lockPopup;   // 잠금 팝업 루트 (LivesLockCanvas). 초기 SetActive false. Show/Hide = SetActive 토글
+  [SerializeField] Text statusText;        // 팝업 카드 안 상태 메시지 ("하트 불러오는 중..", "하트가 길을 잃었어요..." 등)
+  [SerializeField] Button watchButton;     // 팝업 안 "하트 채우러 가기" 버튼
 
   // 규칙 상수 (설계 값. 튜닝은 여기서만)
   const int BaseLives = 3;                    // 기본값 · 자동 복구 상한 · 판 클리어 리필 목표
@@ -38,10 +40,6 @@ public class LivesSystem : MonoBehaviour
   int current;
   long lastLostAt;   // 다음 회복 tick의 앵커(Unix ms). 회복 발생 시 그만큼 앞으로 이동. 3 이상이면 0.
 
-  // 잠금 오버레이
-  Canvas overlayCanvas;
-  Text statusText;   // 팝업 안 상태 메시지("광고 준비 중..." 등)
-
   void Awake()
   {
     Instance = this;
@@ -55,10 +53,11 @@ public class LivesSystem : MonoBehaviour
     UpdateRecoveryTimerText();
     RefreshRecoveryNotification();
 
-    // 라운드 스프라이트 자동 생성 (팝업 카드·버튼 배경에서 재사용)
-    roundedSprite = BuildRoundedSprite(64, 16);
-
     if (fillButton != null) fillButton.onClick.AddListener(RequestRewardedAd);
+    if (watchButton != null) watchButton.onClick.AddListener(RequestRewardedAd);
+
+    // AdManager의 보상형 광고 상태 이벤트 구독 (대기 중이면 버튼 비활성화 + 잠금 오버레이 statusText 갱신)
+    if (adManager != null) adManager.OnRewardedStatus += HandleAdStatus;
 
     // 하트 < 3인 동안 매초 회복 체크 + 타이머 UI 갱신 + 잠금 오버레이 자동 해제.
     StartCoroutine(TickRecovery());
@@ -70,46 +69,6 @@ public class LivesSystem : MonoBehaviour
 
     // 이전 세션에서 잠긴 상태로 종료했다면 로딩 끝난 뒤 UI 표시
     if (current <= 0) ShowLockOverlay();
-  }
-
-  // 흰색 라운드 사각형 스프라이트를 코드로 생성. 9-slice 설정까지 포함해서 어떤 크기로 늘려도 코너 유지됨.
-  // size=64, radius=16이면 코너 반지름이 16px인 은은한 라운드.
-  static Sprite BuildRoundedSprite(int size, int radius)
-  {
-    var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-    tex.filterMode = FilterMode.Bilinear;
-
-    var pixels = new Color32[size * size];
-    var transparent = new Color32(255, 255, 255, 0);
-    var opaque = new Color32(255, 255, 255, 255);
-    int r2 = radius * radius;
-
-    for (int y = 0; y < size; y++)
-    {
-      for (int x = 0; x < size; x++)
-      {
-        // 각 코너 영역까지의 거리 계산. 코너 밖(원 밖)이면 투명 처리.
-        int dx = 0, dy = 0;
-        if (x < radius) dx = radius - x;
-        else if (x >= size - radius) dx = x - (size - radius - 1);
-        if (y < radius) dy = radius - y;
-        else if (y >= size - radius) dy = y - (size - radius - 1);
-
-        pixels[y * size + x] = (dx * dx + dy * dy) <= r2 ? opaque : transparent;
-      }
-    }
-    tex.SetPixels32(pixels);
-    tex.Apply();
-
-    // border 값이 9-slice 코너 크기. Image.Type.Sliced와 조합돼야 라운드 유지됨.
-    return Sprite.Create(
-      tex,
-      new Rect(0, 0, size, size),
-      new Vector2(0.5f, 0.5f),
-      100f,
-      0,
-      SpriteMeshType.FullRect,
-      new Vector4(radius, radius, radius, radius));
   }
 
   // ── 상태 저장/로드 ─────────────────────────────────────
@@ -196,13 +155,29 @@ public class LivesSystem : MonoBehaviour
     HideLockOverlay();
   }
 
-  // "+ 목숨 채우기" 버튼과 잠금 오버레이 "광고 보기" 버튼 공용
+  // "+ 목숨 채우기" 버튼과 잠금 오버레이 "광고 보기" 버튼 공용.
+  // 준비 안 됐어도 AdManager가 대기 상태로 걸어두고 로드 완료 시 자동 표시. 유저는 재탭 불필요.
+  // "광고 준비 중..." 안내는 OnRewardedStatus 이벤트 → HandleAdStatus에서 UI 반영.
   void RequestRewardedAd()
   {
     if (adManager == null) { Debug.LogWarning("AdManager 미연결"); return; }
+    adManager.ShowRewardedAd(ApplyRewardedAdReward);
+  }
 
-    bool shown = adManager.ShowRewardedAd(ApplyRewardedAdReward);
-    if (!shown) SetLockStatus("광고 준비 중입니다. 잠시 후 다시 시도해주세요.");
+  // AdManager.OnRewardedStatus 콜백. 잠금 오버레이 statusText 갱신 + 버튼 활성화 토글.
+  // 로드 중일 때만 버튼 비활성화(회색). 실패/idle 상태면 활성화해 재시도 가능.
+  // 버튼 라벨은 텍스트 스왑하지 않음 — "+3" 같은 작은 라벨에 긴 메시지가 들어가면 UI 깨짐.
+  void HandleAdStatus(string msg)
+  {
+    if (statusText != null) statusText.text = msg;
+    if (fillButton != null)
+      fillButton.interactable = msg != AdManager.RewardedLoadingMessage;
+  }
+
+  void OnDestroy()
+  {
+    if (adManager != null) adManager.OnRewardedStatus -= HandleAdStatus;
+    if (Instance == this) Instance = null;
   }
 
   // ── UI ───────────────────────────────────────────────
@@ -212,66 +187,16 @@ public class LivesSystem : MonoBehaviour
     if (livesText != null) livesText.text = "x" + current;
   }
 
-  void SetLockStatus(string msg)
-  {
-    if (statusText != null) statusText.text = msg;
-  }
-
-  // 잠금 오버레이. UpdateChecker와 같은 방식(코드로 Canvas·Card 생성)
+  // 잠금 팝업 = 씬에 만들어둔 GameObject를 SetActive 토글로 열고 닫음.
+  // (예전엔 코드로 Canvas/Card/Text를 동적으로 만들었음 — 인스펙터 편집 불가라 시각 iteration이 힘들어 씬 배치로 마이그레이션함)
   void ShowLockOverlay()
   {
-    if (overlayCanvas != null) return;
-
-    var canvasGo = new GameObject("LivesLockCanvas");
-    canvasGo.transform.SetParent(transform);
-    overlayCanvas = canvasGo.AddComponent<Canvas>();
-    overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-    overlayCanvas.sortingOrder = 29000;   // UpdateChecker(30000)보다 낮게 두어 강제 업데이트 팝업 우선
-    canvasGo.AddComponent<CanvasScaler>();
-    canvasGo.AddComponent<GraphicRaycaster>();
-
-    var bg = MakeImage(canvasGo, "Background", new Color(0, 0, 0, 0.7f));
-    Stretch(bg.rectTransform);
-
-    var cardGo = new GameObject("Card");
-    cardGo.transform.SetParent(canvasGo.transform, false);
-    var card = cardGo.AddComponent<Image>();
-    card.color = Color.white;
-    ApplyRoundedSprite(card);
-    var cardRt = card.rectTransform;
-    cardRt.anchorMin = cardRt.anchorMax = cardRt.pivot = new Vector2(0.5f, 0.5f);
-    cardRt.anchoredPosition = Vector2.zero;
-    cardRt.sizeDelta = new Vector2(720, 520);
-
-    AddText(cardGo, "Title", "하트를 모두 소진했어요",
-      36, Color.black, TextAnchor.MiddleCenter,
-      new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1),
-      new Vector2(20, -90), new Vector2(-20, -20));
-
-    AddText(cardGo, "Message",
-      "과자가 기다리고 있어요!!",
-      24, new Color(0.2f, 0.2f, 0.2f), TextAnchor.MiddleCenter,
-      new Vector2(0, 0.6f), new Vector2(1, 0.78f), new Vector2(0.5f, 0.5f),
-      new Vector2(30, 0), new Vector2(-30, 0));
-
-    statusText = AddText(cardGo, "Status", "",
-      28, new Color(0.5f, 0.3f, 0.3f), TextAnchor.MiddleCenter,
-      new Vector2(0, 0.35f), new Vector2(1, 0.58f), new Vector2(0.5f, 0.5f),
-      new Vector2(30, 0), new Vector2(-30, 0));
-
-    AddButton(cardGo, "Watch", "하트 채우러 가기",
-      new Vector2(0.1f, 0.06f), new Vector2(0.9f, 0.28f),
-      new Color(1f, 0.54f, 0.54f), Color.white,
-      RequestRewardedAd,
-      roundedSprite);
+    if (lockPopup != null) lockPopup.SetActive(true);
   }
 
   void HideLockOverlay()
   {
-    if (overlayCanvas == null) return;
-    Destroy(overlayCanvas.gameObject);
-    overlayCanvas = null;
-    statusText = null;
+    if (lockPopup != null) lockPopup.SetActive(false);
   }
 
   // 매초 회복 체크 + 하트 옆 타이머 UI 갱신 + 잠금 오버레이 자동 해제.
@@ -289,7 +214,7 @@ public class LivesSystem : MonoBehaviour
         RefreshRecoveryNotification();
       }
       UpdateRecoveryTimerText();
-      if (current > 0 && overlayCanvas != null) HideLockOverlay();
+      if (current > 0 && lockPopup != null && lockPopup.activeSelf) HideLockOverlay();
       yield return wait;
     }
   }
@@ -323,82 +248,5 @@ public class LivesSystem : MonoBehaviour
     int mins = (int)(remain / 60000);
     int secs = (int)((remain / 1000) % 60);
     recoveryTimerText.text = $"{mins:D2}:{secs:D2}";
-  }
-
-  // ── UI 헬퍼 (UpdateChecker와 동일 스타일) ────────────────
-
-  static Image MakeImage(GameObject parent, string name, Color color)
-  {
-    var go = new GameObject(name);
-    go.transform.SetParent(parent.transform, false);
-    var img = go.AddComponent<Image>();
-    img.color = color;
-    return img;
-  }
-
-  static void Stretch(RectTransform rt)
-  {
-    rt.anchorMin = Vector2.zero;
-    rt.anchorMax = Vector2.one;
-    rt.offsetMin = rt.offsetMax = Vector2.zero;
-  }
-
-  static Text AddText(GameObject parent, string name, string content,
-    int fontSize, Color color, TextAnchor align,
-    Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
-    Vector2 offsetMin, Vector2 offsetMax)
-  {
-    var go = new GameObject(name);
-    go.transform.SetParent(parent.transform, false);
-    var text = go.AddComponent<Text>();
-    text.text = content;
-    text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-    text.fontSize = fontSize;
-    text.color = color;
-    text.alignment = align;
-    var rt = text.rectTransform;
-    rt.anchorMin = anchorMin;
-    rt.anchorMax = anchorMax;
-    rt.pivot = pivot;
-    rt.offsetMin = offsetMin;
-    rt.offsetMax = offsetMax;
-    return text;
-  }
-
-  static void AddButton(GameObject parent, string name, string label,
-    Vector2 anchorMin, Vector2 anchorMax,
-    Color bgColor, Color textColor,
-    UnityEngine.Events.UnityAction onClick,
-    Sprite bgSprite = null)
-  {
-    var btnGo = new GameObject(name);
-    btnGo.transform.SetParent(parent.transform, false);
-    var img = btnGo.AddComponent<Image>();
-    img.color = bgColor;
-    if (bgSprite != null)
-    {
-      img.sprite = bgSprite;
-      img.type = Image.Type.Sliced;  // 9-slice 설정된 스프라이트여야 라운드 유지
-    }
-    var rt = img.rectTransform;
-    rt.anchorMin = anchorMin;
-    rt.anchorMax = anchorMax;
-    rt.offsetMin = rt.offsetMax = Vector2.zero;
-
-    var btn = btnGo.AddComponent<Button>();
-    btn.onClick.AddListener(onClick);
-
-    AddText(btnGo, "Text", label,
-      28, textColor, TextAnchor.MiddleCenter,
-      Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-      Vector2.zero, Vector2.zero);
-  }
-
-  // 인스펙터에 스프라이트 지정된 경우에만 카드/버튼 배경에 적용. 없으면 각진 흰 사각형으로 폴백.
-  void ApplyRoundedSprite(Image img)
-  {
-    if (roundedSprite == null) return;
-    img.sprite = roundedSprite;
-    img.type = Image.Type.Sliced;
   }
 }

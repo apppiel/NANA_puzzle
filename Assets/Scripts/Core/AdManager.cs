@@ -46,6 +46,19 @@ public class AdManager : MonoBehaviour
   RewardedAd rewardedAd;
   int levelClearCount = 0; // 현재 세션에서 클리어한 레벨 수
 
+  // 보상형 광고 대기열: 준비 안 됐을 때 유저가 요청한 콜백을 저장해두고, 로드 완료 순간 자동 표시.
+  // 유저가 두 번 탭할 필요 없게 만드는 핵심 상태.
+  Action pendingRewardCallback;
+  const float PendingTimeoutSec = 15f;   // 이 시간 안에 로드 못 하면 대기 취소하고 실패 안내
+
+  // 상태 메시지 상수. LivesSystem이 이 상수와 비교해 로딩 vs 실패 vs idle을 판별.
+  public const string RewardedLoadingMessage = "하트 불러오는 중..";
+  public const string RewardedFailedMessage = "하트가 길을 잃었어요. 잠시 후 다시 불러주세요.";
+
+  // 대기 상태 UI 갱신용. LivesSystem이 구독해 잠금 오버레이 statusText + 버튼 활성화 상태에 반영.
+  // 빈 문자열이면 idle 상태로 복귀.
+  public event Action<string> OnRewardedStatus;
+
   void Start()
   {
 #if UNITY_IOS && !UNITY_EDITOR
@@ -134,28 +147,69 @@ public class AdManager : MonoBehaviour
       {
         Debug.LogWarning("보상형 광고 로드 실패: " + (error?.GetMessage() ?? "ad null"));
         Invoke(nameof(LoadRewardedAd), 30f);  // 전면광고와 동일 재시도 패턴
+        // 유저가 대기 중이었으면 실패 안내 (다음 재시도는 30초 뒤라 그때까지 기다리게 두지 않음)
+        NotifyPendingFailed();
         return;
       }
       rewardedAd = ad;
       Debug.Log("보상형 광고 로드 완료");
+      // 유저가 이미 탭해 대기 중이면 자동 표시
+      TryShowPending();
     });
   }
 
-  // 광고 준비돼 있으면 표시하고 완주 시 onReward 콜백. 준비 안 됐으면 false 반환하며 로드만 시도.
-  // LivesSystem이 false를 받으면 잠금 UI에서 "광고 준비 중" 안내 후 유저에게 재시도 유도
+  // 광고 준비돼 있으면 즉시 표시. 준비 안 됐으면 대기열에 넣고 로드 완료 순간 자동 표시.
+  // 반환값은 즉시 표시 여부(true=바로 뜸, false=대기 중). 대기 상태는 OnRewardedStatus 이벤트로 UI 갱신.
   public bool ShowRewardedAd(Action onReward)
   {
-    if (rewardedAd == null || !rewardedAd.CanShowAd())
+    // 준비돼 있으면 즉시 표시 — 대기 중이던 요청이 있어도 이걸 우선 처리
+    if (rewardedAd != null && rewardedAd.CanShowAd())
     {
-      LoadRewardedAd();
-      return false;
+      ClearPending();
+      // 광고 닫힌 뒤 다음 광고 미리 로드
+      rewardedAd.OnAdFullScreenContentClosed += () => LoadRewardedAd();
+      // Show 콜백은 유저가 광고 완주(보상 획득)했을 때만 호출. 중도 종료 시 호출 안 됨.
+      rewardedAd.Show(_ => onReward?.Invoke());
+      return true;
     }
 
-    // 광고 닫힌 뒤 다음 광고 미리 로드
+    // 준비 안 됨: 대기열에 넣고 로드 시도. 로드 완료 콜백이 자동으로 Show 처리.
+    pendingRewardCallback = onReward;
+    CancelInvoke(nameof(PendingTimeout));
+    Invoke(nameof(PendingTimeout), PendingTimeoutSec);
+    OnRewardedStatus?.Invoke(RewardedLoadingMessage);
+    LoadRewardedAd();
+    return false;
+  }
+
+  // 로드 완료 시점에 대기 중이던 요청이 있으면 자동으로 광고 표시.
+  void TryShowPending()
+  {
+    if (pendingRewardCallback == null) return;
+    if (rewardedAd == null || !rewardedAd.CanShowAd()) return;
+
+    var reward = pendingRewardCallback;
+    ClearPending();
     rewardedAd.OnAdFullScreenContentClosed += () => LoadRewardedAd();
-    // Show 콜백은 유저가 광고 완주(보상 획득)했을 때만 호출. 중도 종료 시 호출 안 됨.
-    rewardedAd.Show(_ => onReward?.Invoke());
-    return true;
+    rewardedAd.Show(_ => reward?.Invoke());
+  }
+
+  // 로드 실패 또는 15초 타임아웃 시 호출. 대기 취소하고 유저에게 실패 안내.
+  void NotifyPendingFailed()
+  {
+    if (pendingRewardCallback == null) return;
+    ClearPending();
+    OnRewardedStatus?.Invoke(RewardedFailedMessage);
+  }
+
+  // Invoke 대상 (nameof 참조 유지 위해 private void 시그니처 필요).
+  void PendingTimeout() => NotifyPendingFailed();
+
+  void ClearPending()
+  {
+    pendingRewardCallback = null;
+    CancelInvoke(nameof(PendingTimeout));
+    OnRewardedStatus?.Invoke("");
   }
 
   void OnDestroy()

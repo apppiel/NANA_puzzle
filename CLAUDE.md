@@ -31,7 +31,7 @@
 - BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
 - GameManager.cs: 레벨 목록·진행 상태 관리. 랜덤 셔플 로직(1~10 순차 / 11-30·31-70·**71-110** 그룹 안 미클리어 풀 랜덤 — 마지막 그룹은 40개 풀에서 30번 뽑음). 매 판 선택 시점마다 재선택(옵션 B, 앱 재실행·클리어 모두). PlayerPrefs에 clearedCount(int) + clearedMask 저장. **TotalDisplayLevels=100 상수** 도입해 asset 개수(110)와 유저 진행도(N/100)·보상 트리거를 분리. 구버전 currentLevel은 마이그레이션. 100판 클리어 시 RewardManager.ShowReward(), 판 클리어 시 livesSystem.OnLevelCleared() 호출. 리셋 이벤트는 livesSystem.Decrement()로 이관. `editorTestLevel` 필드(#if UNITY_EDITOR): 값이 있으면 랜덤 무시하고 그 레벨만 반복 로드.
 - RewardManager.cs: 모든 레벨 클리어 시 랜덤 인증코드(예: A3K9-XZ21) 생성. Firebase Firestore에 기기 ID 키로 저장(중복 방지). UI Toolkit 기반 RewardPanel 제어. RewardUI GameObject에 UIDocument와 함께 부착.
-- AdManager.cs: 전면 광고 + 보상형 광고 로드/표시. **전면 광고**: N레벨마다 표시(기본 3레벨). 카운트 임계치 방식(`count >= N`) — 광고 준비 안 됐으면 카운트 유지한 채 LoadAd()만 호출 → 다음 클리어에서 즉시 표시. 표시 성공 시에만 count=0 리셋. **보상형 광고**: `ShowRewardedAd(Action onReward)` 노출. 완주 콜백에서 onReward 실행(중도 종료 시 미실행). 로드 실패 시 30초 자동 재시도(`CancelInvoke`로 중복 방지). Rewarded unit ID는 Android/iOS 각각 별도. **기존 "4번 리셋 광고" 로직 삭제됨** — 목숨 시스템(LivesSystem)으로 완전 대체.
+- AdManager.cs: 전면 광고 + 보상형 광고 로드/표시. **전면 광고**: N레벨마다 표시(기본 3레벨). 카운트 임계치 방식(`count >= N`) — 광고 준비 안 됐으면 카운트 유지한 채 LoadAd()만 호출 → 다음 클리어에서 즉시 표시. 표시 성공 시에만 count=0 리셋. **보상형 광고**: `ShowRewardedAd(Action onReward)` 노출. 완주 콜백에서 onReward 실행(중도 종료 시 미실행). 로드 실패 시 30초 자동 재시도(`CancelInvoke`로 중복 방지). Rewarded unit ID는 Android/iOS 각각 별도. **기존 "4번 리셋 광고" 로직 삭제됨** — 목숨 시스템(LivesSystem)으로 완전 대체. **Pending + 자동 표시**: 유저가 탭했는데 광고 미준비면 `pendingRewardCallback`에 저장 + 15초 타임아웃 Invoke → 로드 완료 순간 자동 표시(재탭 불필요). `OnRewardedStatus` 이벤트로 상태 문자열 브로드캐스트(`RewardedLoadingMessage`/`RewardedFailedMessage` 상수). LivesSystem이 구독해 잠금 오버레이 statusText + `+ 목숨 채우기` 버튼 활성화 상태에 반영. 문구는 하트/과자 세계관 톤 ("하트 불러오는 중..", "하트가 길을 잃었어요..."). "광고" 단어 유저 UI에 노출 금지.
 - SettingsPanel.cs: UI Toolkit 기반 설정 패널 제어. SettingsUI GameObject에 UIDocument와 함께 부착. SettingsManager와 분리되어 있어 UI만 담당.
 - Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
 - Assets/google-services.json: Firebase 프로젝트 설정 파일. 패키지명 com.nanaBox.NANApuzzle.
@@ -39,7 +39,7 @@
 - ScreenCaptureProtection.cs: 캡처 방지. Android는 UI 스레드에서 FLAG_SECURE 세팅(스크린샷·녹화·미러링 완전 차단). iOS는 UIScreen.isCaptured 폴링해 감지 시 최상단 검은 오버레이(sortingOrder=32767). 씬에 GameObject 하나 만들어 부착. Android는 runOnUiThread가 비동기라 람다 안에서 activity를 재획득해야 함(dispose 이슈).
 - ScreenCaptureBridge.mm: iOS 네이티브 브릿지. `_IsScreenBeingCaptured()` 하나만 노출. UIKit 프레임워크 사용.
 - UpdateChecker.cs: 강제 업데이트 유도. 앱 시작 시 Firestore `config/app_version` 문서에서 `androidLatestVersion`/`iosLatestVersion` 조회 후 Application.version과 비교. System.Version으로 비교, 낮으면 UGUI 팝업(반투명 배경 + 흰 카드 + [종료]/[업데이트]). **[종료] = Application.Quit** (강제 업데이트라 팝업만 없애는 우회 차단, 다음 실행 때 Start()가 다시 돌면서 팝업 재표시). [업데이트]는 스토어 URL 열기(Android market://, iOS apps.apple.com/app/id{IosAppId}). 에디터에선 `#if UNITY_EDITOR return`으로 스킵. Start()에서만 체크하므로 백그라운드 복귀는 트리거 안 됨 — [종료] 유도로 이 문제 해소.
-- LivesSystem.cs: 목숨(하트) 시스템. **규칙**: 기본 3(최대 99), 리셋마다 -1, 판 클리어 시 3 미만이면 3으로 리필/3 이상이면 그대로 유지(누적 자원 소모형), 광고 시청 시 +3. **자동 복구**: 3 미만이면 **10분마다 1개씩** 회복(상한 3). `lastLostAt`은 다음 회복 tick의 앵커로 사용되어, tick 발생 시 그만큼 앵커를 앞으로 이동시켜 남은 카운트 유지. 앱을 오래 껐다 켜도 정확히 계산(예: 25분 후 → 2개 회복 + 5분 남은 카운트 유지). **저장**: PlayerPrefs `livesCurrent` + `livesLostAt` 두 키. **UI**: 상단 하트 표시(TMP_Text) + 하트 옆 `recoveryTimerText`(MM:SS, 하트 < 3일 때만 표시) + [+ 목숨 채우기] 버튼(자발적 광고 시청) + 잠금 오버레이(코드로 Canvas 생성, 라운드 스프라이트도 procedural 생성). `TickRecovery` 코루틴이 항상 돌면서 매초 회복 체크·타이머 갱신·잠금 오버레이 자동 해제(하트 0→1로 회복 시 자동 잠금 해제). 로딩 스크린 사라진 뒤에만 오버레이 표시. AdManager.ShowRewardedAd 완주 콜백으로 리필. **Task #7 논의**: 하트 4+ 상태에서 광고 강제 로직은 광고 시청 인센티브 소멸 위험으로 폐기 결정.
+- LivesSystem.cs: 목숨(하트) 시스템. **규칙**: 기본 3(최대 99), 리셋마다 -1, 판 클리어 시 3 미만이면 3으로 리필/3 이상이면 그대로 유지(누적 자원 소모형), 광고 시청 시 +3. **자동 복구**: 3 미만이면 **10분마다 1개씩** 회복(상한 3). `lastLostAt`은 다음 회복 tick의 앵커로 사용되어, tick 발생 시 그만큼 앵커를 앞으로 이동시켜 남은 카운트 유지. 앱을 오래 껐다 켜도 정확히 계산(예: 25분 후 → 2개 회복 + 5분 남은 카운트 유지). **저장**: PlayerPrefs `livesCurrent` + `livesLostAt` 두 키. **UI**: 상단 하트 표시(TMP_Text) + 하트 옆 `recoveryTimerText`(MM:SS, 하트 < 3일 때만 표시) + [+ 목숨 채우기] 버튼(자발적 광고 시청) + 잠금 팝업(**씬에 만들어둔 `LivesLockCanvas` GameObject를 SerializeField로 참조 → SetActive 토글**). 인스펙터 필드: `lockPopup` / `statusText` / `watchButton`. `HandleAdStatus`가 AdManager.OnRewardedStatus 구독해 로드 중일 때 fillButton.interactable=false + statusText에 상태 문구 표시. `TickRecovery` 코루틴이 항상 돌면서 매초 회복 체크·타이머 갱신·잠금 팝업 자동 해제(하트 0→1로 회복 시 자동 잠금 해제). 로딩 스크린 사라진 뒤에만 팝업 표시. AdManager.ShowRewardedAd 완주 콜백으로 리필. **팝업 UI는 씬 배치로 마이그레이션됨** — 예전엔 코드로 Canvas/Card/Text를 동적 생성했지만 시각 iteration 불편해서 씬 편집 방식으로 전환. UI 헬퍼(BuildRoundedSprite/MakeImage/AddText/AddButton 등) 및 관련 필드 전부 삭제(150+줄). **Task #7 논의**: 하트 4+ 상태에서 광고 강제 로직은 광고 시청 인센티브 소멸 위험으로 폐기 결정.
 - BackButtonHandler.cs: 안드로이드 뒤로가기 버튼 처리(KeyCode.Escape 매핑, iOS는 자연스레 no-op). 우선순위: (1)자기 팝업 뜸→닫기 (2)강제 업데이트 팝업(UpdatePromptCanvas)→무시 (3)설정창(SettingsPanel.IsOpen)→닫기 (4)그 외(하트 잠금 포함)→종료 확인 팝업. 팝업: 반투명 배경 + 라운드 흰 카드 + [돌아가기]/[종료하기] 버튼(카드/버튼 모두 procedural rounded sprite). sortingOrder 29500(LivesLock 29000보다 위, UpdatePrompt 30000보다 아래). 씬에 빈 GameObject 만들어 부착, 인스펙터의 Settings Panel 슬롯에 SettingsUI 연결.
 - SettingsPanel.cs: BackButtonHandler에서 열림 상태 확인용 `public bool IsOpen` 프로퍼티 노출(`overlay.resolvedStyle.display == Flex`).
 - NotificationHelper.cs: 하트 회복 완료 로컬 알림. `com.unity.mobile.notifications` 2.4.3 사용. 씬에 GameObject 부착. LivesSystem이 상태 변경 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 `Instance.ScheduleHeartFull` / `Cancel` 호출. Android Small Icon은 **투명 배경 + 흰 픽셀만** 인식(컬러/미등록 시 알림 안 뜸). `Assets/Editor/NotificationIconTool.cs`가 흰 하트 실루엣 자동 생성 메뉴 제공. 앱 실행 중 하트 3 도달 시 Cancel은 의도된 스팸 방지 동작(유저가 앱에서 직접 확인 가능하므로).
@@ -63,6 +63,13 @@
   - 전체 stretch: LoadingPanel — Stretch (0,0)/(1,1) + AspectRatioFitter Envelope Parent
 - **LoadingPanel AspectRatioFitter**: aspectMode Envelope Parent + aspectRatio 0.4615 (=1080/2340, GameTitle.png 실제 비율). aspectRatio 잘못 잡으면 오버플로우(폭 튀어나옴) — 이미지 비율 바꿀 때 이 값도 같이 바꿔야 함.
 - **함정**: CanvasScaler 기본값이 Constant Pixel Size + 800×600(옛 유니티 기본)이라 초기엔 반응형 아님. 잊고 그대로 두면 실기에서 UI가 어긋남 (2026-07-29 발견·수정).
+
+## LivesLockCanvas (하트 잠금 팝업 씬 배치)
+- 씬에 별도 UGUI Canvas로 존재 (sortingOrder 29000, ScreenSpaceOverlay, Scale With Screen Size 1080×2340 Match Width). LivesSystem이 SetActive로 열고 닫음. 초기 SetActive false.
+- **계층**: `LivesLockCanvas → Background(어둠) / CardBorder(분홍 프레임) / Card(크림핑크) → Title / Divider / Message / StatusText / WatchButton→Text`
+- **9-slice 스프라이트**: `Assets/Art/Rectangle 1.png` — Figma에서 100×100 라운드 사각형(코너 10, 흰색) → 2x export → Sprite Editor에서 Border 20 세팅. CardBorder/Card/WatchButton 3개 Image가 이 하나를 공유하고 색은 각자 tint. **함정**: Sprite Editor에서 Multiple 모드로 자동 전환되면 spriteBorder가 최상위에서 0으로 리셋됨 — .meta 파일에서 `spriteMode: 1` + `spriteBorder` 값 확인 필요.
+- **문구 톤**: "광고" 단어 유저 UI에 노출 금지. "달콤한 과자가 기다리고 있어요" 같은 카피는 실물 과자 상품 티저 (100판 클리어 보상). 상태 메시지는 `AdManager.RewardedLoadingMessage`/`RewardedFailedMessage` 상수에서 관리.
+- **버튼 라벨 스왑 금지**: `+3` 같은 작은 버튼 라벨에 긴 상태 메시지 넣으면 오버플로우로 UI 깨짐. 대신 `Button.interactable` 토글로 로딩 중 회색 처리.
 
 ## 게임 규칙 / 데이터 모델
 - 칸 좌표는 Vector2Int (x=열, y=행), (0,0)은 왼쪽 아래.
@@ -165,6 +172,10 @@
 - [x] BackButtonHandler 신규 — 안드로이드 뒤로가기 → 종료 확인 팝업. 우선순위(자기팝업/UpdateChecker/설정창/그외) 처리. 라운드 카드+버튼. SettingsPanel.IsOpen 프로퍼티 추가로 연동
 - [x] Android Unity Ads Mediation 통합 (2026-07-29) — AdMob 콘솔에 Android Interstitial/Rewarded 미디에이션 그룹 생성 + Unity Ads 소스 매핑. Unity Ads Dashboard 나나박스 프로젝트/placements 확인. UnityAds Mediation Plugin v3.19.0 Source zip에서 `Assets/GoogleMobileAds/Mediation/UnityAds/`로 수동 복사(UPM 방식은 GoogleMobileAds 11.2.0 Assets 방식과 의존성 불일치로 실패). SJ Phone(광고 ID) AdMob·Unity Ads 양쪽 테스트 기기 등록. Ad Inspector Single Ad Source Test에서 Unity Ads 응답 확인. 평상시 mediation에선 AdMob이 eCPM 경쟁으로 이기는 게 자연스러움
 - [x] UGUI Canvas 반응형 전환 (2026-07-29) — CanvasScaler를 Constant Pixel Size + 800×600 기본값에서 Scale With Screen Size + 1080×2340 + Match Width로 변경. HUD 8개 중 어긋난 3개(SettingsButton→Top Left, Heart/LiveCountText→Top Right)를 Middle Center에서 재앵커링(화면 좌표는 유지). LoadingPanel AspectRatioFitter aspectRatio 0.5625→0.4615(이미지 실제 비율)로 오버플로우 해소. 실기 검증 대기
+- [x] AdManager 보상형 광고 Pending + 자동 표시 흐름 (2026-07-30) — 유저 첫 탭에서 광고 미준비면 대기열에 저장 + 15초 타임아웃 걸고, 로드 완료 순간 자동 재생(재탭 불필요). `OnRewardedStatus` 이벤트로 상태 문자열 브로드캐스트. 로드 실패 시 즉시 실패 안내(30초 재시도까지 안 기다림). LivesSystem이 구독해 fillButton.interactable 토글 + statusText 갱신
+- [x] 유저 UI 문구 "광고"→"하트/과자" 세계관으로 통일 (2026-07-30) — RewardedLoadingMessage="하트 불러오는 중..", RewardedFailedMessage="하트가 길을 잃었어요. 잠시 후 다시 불러주세요." 상수화. 발주자 요구: 광고 시청 유도라는 사실을 노골적으로 드러내지 않기
+- [x] LivesLockCanvas 씬 배치 마이그레이션 (2026-07-30) — 기존 코드로 Canvas/Card/Text 동적 생성 → 씬에 미리 만들어둔 UI를 SerializeField로 참조 + SetActive 토글로 변경. LivesSystem 150+줄 삭제(BuildRoundedSprite/MakeImage/AddText/AddButton 등 UI 헬퍼 전부). 이유: 매 색·폰트 변경마다 코드 편집+컴파일 반복 지옥에서 벗어나 시각 iteration 가능하게. 팝업 디자인도 개선(딥 로즈 ♥ 심볼 제목, 큰 메인 메시지 세로 중앙 배치, 분홍 프레임 + 크림핑크 카드, 코랄 버튼)
+- [x] 라운드 스프라이트 도입 (2026-07-30) — Figma에서 만든 `Assets/Art/Rectangle 1.png` (100×100, corner radius 10 → 2x export → Border 20 9-slice). CardBorder/Card/WatchButton 3개 Image에 공유 + 색은 tint로 다르게. 함정 발견: Sprite Editor에서 Multiple 모드로 자동 전환되면 최상위 spriteBorder가 0으로 리셋됨 → .meta에서 `spriteMode: 1` 직접 세팅으로 복구
 
 ## 다음 할 일 (TODO)
 - [x] **하트 회복 완료 로컬 알림** — Unity `com.unity.mobile.notifications` 2.4.3 도입. NotificationHelper.cs로 예약/취소 캡슐화, LivesSystem이 상태 변경 지점 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 RefreshRecoveryNotification 호출. 설정창에 알림 토글 추가(기본 ON). Android Small Icon은 흰 실루엣 하트(NotificationIconTool 에디터 메뉴로 자동 생성). 앱 실행 중 하트 3 도달 시 알림 취소는 의도된 스팸 방지 동작. 실기 검증 완료 2026-07-29
@@ -195,42 +206,4 @@
 LLM의 흔한 코딩 실수를 줄이기 위한 행동 지침. 프로젝트 지침과 함께 사용.
 
 **트레이드오프:** 이 지침은 속도보다 신중함을 우선시함. 사소한 작업은 상황에 맞게 판단할 것.
-
-## 1. 코딩 전에 먼저 생각하기
-
-**가정하지 말 것. 혼란을 숨기지 말 것. 트레이드오프를 드러낼 것.**
-
-구현 전에:
-- 가정한 내용을 명확히 밝힐 것. 불확실하면 질문할 것.
-- 해석이 여러 가지라면 선택지를 제시할 것. 혼자 선택하지 말 것.
-- 더 단순한 방법이 있다면 말할 것. 필요하면 반론을 제기할 것.
-- 불분명한 부분이 있으면 멈출 것. 무엇이 헷갈리는지 짚고 질문할 것.
-
-## 2. 단순함 우선
-
-**문제를 해결하는 최소한의 코드. 추측성 코드는 금지.**
-
-- 요청한 것 이상의 기능은 추가하지 말 것.
-- 한 번만 쓰는 코드에 추상화 계층 만들지 말 것.
-- 요청하지 않은 "유연성"이나 "설정 가능성" 넣지 말 것.
-- 불가능한 시나리오에 대한 에러 처리 넣지 말 것.
-- 200줄로 짰는데 50줄로 될 것 같으면 다시 짤 것.
-
-스스로에게 물어볼 것: "시니어 엔지니어가 보면 과하다고 할까?" 그렇다면 단순하게.
-
-## 3. 최소한의 변경
-
-**꼭 필요한 부분만 건드릴 것. 내가 만든 문제만 정리할 것.**
-
-기존 코드 수정 시:
-- 인접한 코드, 주석, 포맷을 "개선"하지 말 것.
-- 안 망가진 건 리팩터링하지 말 것.
-- 스타일이 마음에 안 들어도 기존 스타일에 맞출 것.
-- 관련 없는 죽은 코드를 발견하면 언급은 하되 삭제하지 말 것.
-
-내 변경으로 생긴 잔재가 있다면:
-- 내 변경으로 인해 쓰이지 않게 된 import/변수/함수는 제거할 것.
-- 원래부터 있던 죽은 코드는 요청 없이 건드리지 말 것.
-
-기준: 변경된 모든 줄이 사용자의 요청과 직접 연결되어야 함.
 
