@@ -19,13 +19,15 @@ public class GameManager : MonoBehaviour
   public LevelData editorTestLevel;  // 값이 있으면 랜덤/진행 무시하고 이 레벨만 계속 로드
 #endif
 
-  // 그룹 경계. 진입장벽 낮추기 위해 1~10은 순차 고정, 나머지는 그룹 안에서만 랜덤
-  // asset index 기준: [0,10) [10,30) [30,70) [70,110)
-  // 마지막 그룹은 40개 풀에서 30개만 뽑음 → 매 세션마다 못 본 10개가 달라져 재플레이 유도
-  static readonly int[] GroupBoundaries = { 0, 10, 30, 70, 110 };
+  // 그룹 경계. 진입장벽 낮추기 위해 1~10은 순차 고정, 나머지는 그룹 안에서만 랜덤.
+  // 각 그룹의 pool 크기 = slot 수 (모든 asset을 반드시 클리어).
+  // asset index 기준: [0,10) [10,70) [70,90) [90,100)
+  //   G1 1~10 순차 / G2 11~70 랜덤 / G3 71~90 랜덤 / G4 91~100 랜덤
+  // (구 로직에 있던 [70,110) 40-pool·30-pick 재플레이 유도 방식은 폐기됨. asset 100~109는 신 로직에서 안 뽑힘.)
+  static readonly int[] GroupBoundaries = { 0, 10, 70, 90, 100 };
 
   // 유저에게 노출되는 총 판 수 (진행도 표시·보상 트리거 기준).
-  // asset 개수(levels.Length=110)와 별개. 71~110 그룹은 40개 풀이지만 유저는 30번만 뽑아 100판 완주로 인식.
+  // 신 로직에선 asset index [0,100)와 정확히 일치. levels.Length=110은 구 유저 데이터 호환용으로 유지.
   const int TotalDisplayLevels = 100;
 
   const string LegacyProgressKey = "currentLevel";  // 구버전 유저 마이그레이션용
@@ -51,7 +53,25 @@ public class GameManager : MonoBehaviour
 
     ClearPrefsIfReinstalled();
     LoadProgress();
-    PickAndLoadNext();
+
+    if (clearedCount >= TotalDisplayLevels)
+    {
+      // 완주 상태로 앱 재시작: 신 로직에선 뽑을 asset이 없어 PickAndLoadNext가 아무것도 안 함 → 검은 화면 정지.
+      // 배경으로 Level_1 깔고 보상 팝업 자동 재발동. 유저는 이미 발급받은 코드 다시 보고 [1레벨로]로 리셋 가능.
+      LoadLevel(0);
+      StartCoroutine(ShowRewardAfterFrame());
+    }
+    else
+    {
+      PickAndLoadNext();
+    }
+  }
+
+  // RewardManager.Start가 먼저 돌 보장이 없어서 1프레임 양보한 뒤 팝업 호출
+  IEnumerator ShowRewardAfterFrame()
+  {
+    yield return null;
+    if (rewardManager != null) rewardManager.ShowReward();
   }
 
 #if UNITY_EDITOR
@@ -113,16 +133,35 @@ public class GameManager : MonoBehaviour
 
     if (PlayerPrefs.HasKey(ClearedCountKey))
     {
-      clearedCount = Mathf.Clamp(PlayerPrefs.GetInt(ClearedCountKey, 0), 0, levels.Length);
+      int savedCount = PlayerPrefs.GetInt(ClearedCountKey, 0);
       string mask = PlayerPrefs.GetString(ClearedMaskKey, "");
       int n = Mathf.Min(levels.Length, mask.Length);
       for (int i = 0; i < n; i++) cleared[i] = (mask[i] == '1');
+
+      // 신 그룹핑 마이그레이션. 구 로직에선 clearedCount가 asset [0,110) 전체 기준이라
+      // asset 100~109 클리어가 카운트에 포함됐음. 신 로직은 [0,100)만 대상이라 재계산 필요.
+      if (savedCount >= TotalDisplayLevels)
+      {
+        // 구버전 완주자: 진행도 유지가 우선. cleared[0..99] 전부 true로 강제해 완주 상태 보장.
+        // (안 그러면 asset 100~109 클리어분이 신 로직에선 무의미해서 92/100 같이 밀림)
+        int cap = Mathf.Min(cleared.Length, TotalDisplayLevels);
+        for (int i = 0; i < cap; i++) cleared[i] = true;
+        clearedCount = TotalDisplayLevels;
+        SaveProgress();
+      }
+      else
+      {
+        // 미완주자: mask[0..99]의 실제 '1' 개수로 재계산. asset 100~109 클리어 흔적은 카운트에서 제외.
+        clearedCount = 0;
+        int cap = Mathf.Min(cleared.Length, TotalDisplayLevels);
+        for (int i = 0; i < cap; i++) if (cleared[i]) clearedCount++;
+      }
     }
     else if (PlayerPrefs.HasKey(LegacyProgressKey))
     {
       // 구버전은 "지금 도전 중인 판의 index"만 저장했음 → 그 값이 곧 클리어한 판 수
       // 어느 index를 클리어했는지 정보가 없으니 앞 N개를 클리어한 걸로 간주 (구버전은 순차 진행이었음)
-      int legacy = Mathf.Clamp(PlayerPrefs.GetInt(LegacyProgressKey, 0), 0, levels.Length);
+      int legacy = Mathf.Clamp(PlayerPrefs.GetInt(LegacyProgressKey, 0), 0, TotalDisplayLevels);
       clearedCount = legacy;
       for (int i = 0; i < clearedCount; i++) cleared[i] = true;
       SaveProgress();
@@ -239,6 +278,16 @@ public class GameManager : MonoBehaviour
   {
     yield return new WaitForSeconds(1.0f);
     ShowEditorTestLevel();
+  }
+
+  // 에디터 전용: 100판 클리어까지 안 가고도 보상 팝업 흐름을 검증할 수 있게.
+  // 인스펙터에서 GameManager 컴포넌트 우클릭 → 메뉴로 실행.
+  // 첫 회는 신규 저장, 이후엔 "이미 발급됨" 경로. 재저장 검증하려면 Firestore Console에서 rewards/{deviceId} 수동 삭제 후 다시 실행.
+  [ContextMenu("[TEST] Show Reward Popup")]
+  void TestShowRewardPopup()
+  {
+    if (rewardManager != null) rewardManager.ShowReward();
+    else Debug.LogWarning("rewardManager 인스펙터 연결 필요");
   }
 #endif
 

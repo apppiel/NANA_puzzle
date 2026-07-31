@@ -116,6 +116,20 @@
     background-color: rgb(230, 90, 90);
 }
 
+/* 다시 시도 버튼 — 저장 실패 시에만 노출. 눈에 띄되 강하지 않은 톤 */
+.btn-retry {
+    background-color: rgb(255, 175, 130);
+    color: rgb(255, 255, 255);
+}
+
+.btn-retry:hover {
+    background-color: rgb(255, 155, 105);
+}
+
+.btn-retry:active {
+    background-color: rgb(230, 130, 80);
+}
+
 /* 1레벨로 버튼 — 외곽선 스타일 */
 .btn-secondary {
     background-color: rgba(0, 0, 0, 0);
