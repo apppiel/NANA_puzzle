@@ -394,6 +394,11 @@ public class BoardRenderer : MonoBehaviour
     // 클리어됐거나, 등장 애니메이션 중이거나, 자동 리셋 대기 중이거나, 레벨 미로드 시 입력 무시
     if (won || appearing || isResetting || level == null) return;
 
+    // 하트 잠금 팝업 뜬 동안 raw Input 우회 방지.
+    // UGUI Canvas는 EventSystem raycast만 막고 Input.GetMouseButtonDown은 그대로 통과시켜서
+    // 유저가 카드 밖 반투명 영역을 탭·드래그하면 보드가 반응해버림 → 잠금 우회 성립.
+    if (LivesSystem.Instance != null && LivesSystem.Instance.IsLocked) return;
+
     AnimateGlow();
 
     // 손가락(마우스 버튼) 처음 눌렀을 때

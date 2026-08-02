@@ -44,7 +44,9 @@ public class AdManager : MonoBehaviour
 
   InterstitialAd interstitialAd;
   RewardedAd rewardedAd;
-  int levelClearCount = 0; // 현재 세션에서 클리어한 레벨 수
+  // 광고 표시 임계치 카운트. PlayerPrefs로 세션 간 유지 — 습관적으로 앱 껐다 켜는 유저의 광고 스킵 방지.
+  int levelClearCount = 0;
+  const string LevelClearCountKey = "adLevelClearCount";
 
   // 보상형 광고 대기열: 준비 안 됐을 때 유저가 요청한 콜백을 저장해두고, 로드 완료 순간 자동 표시.
   // 유저가 두 번 탭할 필요 없게 만드는 핵심 상태.
@@ -61,6 +63,8 @@ public class AdManager : MonoBehaviour
 
   void Start()
   {
+    levelClearCount = PlayerPrefs.GetInt(LevelClearCountKey, 0);
+
 #if UNITY_IOS && !UNITY_EDITOR
     instance = this;
     // iOS: Apple 정책상 ATT 권한 팝업을 먼저 띄운 뒤 AdMob 초기화
@@ -107,6 +111,7 @@ public class AdManager : MonoBehaviour
   public void OnLevelCleared()
   {
     levelClearCount++;
+    PlayerPrefs.SetInt(LevelClearCountKey, levelClearCount);
 
     // 아직 임계치에 못 미치면 대기
     if (levelClearCount < showEveryNLevels) return;
@@ -116,6 +121,7 @@ public class AdManager : MonoBehaviour
     if (interstitialAd != null && interstitialAd.CanShowAd())
     {
       levelClearCount = 0;
+      PlayerPrefs.SetInt(LevelClearCountKey, 0);
       // 광고가 닫히면 다음 광고를 미리 로드
       interstitialAd.OnAdFullScreenContentClosed += () => LoadAd();
       interstitialAd.Show();

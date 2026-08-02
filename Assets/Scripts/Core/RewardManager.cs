@@ -131,10 +131,14 @@ public class RewardManager : MonoBehaviour
                 { "createdAt", FieldValue.ServerTimestamp }
             };
 
-            var rewardsTask = db.Collection("rewards").Document(deviceId).SetAsync(data);
-            var indexTask   = db.Collection("code_index").Document(newCode).SetAsync(indexData);
+            // WriteBatch로 원자적 커밋. 둘 다 성공하거나 둘 다 실패 — 부분 실패 상태가 원천 봉쇄됨.
+            // (이전엔 Task.WhenAll로 따로 SetAsync 후 대기했는데, rewards만 저장되고 code_index가 실패하면
+            //  유저는 코드 받는데 웹 검증은 실패하는 유령 코드가 발생했었음)
+            var batch = db.StartBatch();
+            batch.Set(db.Collection("rewards").Document(deviceId), data);
+            batch.Set(db.Collection("code_index").Document(newCode), indexData);
 
-            Task.WhenAll(rewardsTask, indexTask).ContinueWithOnMainThread(saveTask =>
+            batch.CommitAsync().ContinueWithOnMainThread(saveTask =>
             {
                 if (saveTask.IsCompletedSuccessfully)
                 {

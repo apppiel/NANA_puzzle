@@ -8,7 +8,7 @@ using TMPro;
 // - 목숨 값 하나로 관리 (기본 3, 상한 99)
 // - 리셋 시 -1, 0 되면 잠금 오버레이
 // - 광고 시청 시 +3
-// - 판 클리어 시: 3 미만이면 3으로 리필, 3 이상이면 그대로 유지 (누적 자원 소모형)
+// - 판 클리어 시: 값과 무관하게 무조건 3으로 리셋 (광고로 쌓은 여분은 클리어 순간 초기화)
 // - 자동 복구: 3 미만이면 10분마다 1개씩 회복 (상한 3). 하트 옆 recoveryTimerText에 다음 회복까지 MM:SS 표시.
 public class LivesSystem : MonoBehaviour
 {
@@ -127,20 +127,17 @@ public class LivesSystem : MonoBehaviour
     if (current <= 0) ShowLockOverlay();
   }
 
-  // 판 클리어 → 3 미만이면 3으로 리필. 3 이상(누적된 여분)이면 그대로 유지. GameManager.OnLevelSolved에서 호출
+  // 판 클리어 → 현재 값과 무관하게 무조건 3으로 리셋. GameManager.OnLevelSolved에서 호출.
+  // 판 진행 중엔 광고로 99까지 스택 가능하지만, 클리어 순간 초과분은 버림.
   public void OnLevelCleared()
   {
-    if (current < BaseLives)
-    {
-      current = BaseLives;
-      lastLostAt = 0;
-      SaveState();
-      UpdateHudText();
-      UpdateRecoveryTimerText();
-      RefreshRecoveryNotification();
-      HideLockOverlay();
-    }
-    // else: current 그대로 유지 (누적 자원은 소모형)
+    current = BaseLives;
+    lastLostAt = 0;
+    SaveState();
+    UpdateHudText();
+    UpdateRecoveryTimerText();
+    RefreshRecoveryNotification();
+    HideLockOverlay();
   }
 
   // GameManager.ResetAndRestart에서 호출. 최소 하트 3 보장(0 상태로 리셋되어 즉시 잠금 상태 방지).
@@ -200,6 +197,10 @@ public class LivesSystem : MonoBehaviour
     if (livesText != null) livesText.text = "x" + current;
   }
 
+  // 잠금 팝업 활성 여부. BoardRenderer가 이걸 보고 잠금 중엔 raw Input 무시.
+  // (UGUI Canvas는 EventSystem raycast만 막고 Input.GetMouseButtonDown은 못 막아서 별도 가드 필요)
+  public bool IsLocked => lockPopup != null && lockPopup.activeSelf;
+
   // 잠금 팝업 = 씬에 만들어둔 GameObject를 SetActive 토글로 열고 닫음.
   // (예전엔 코드로 Canvas/Card/Text를 동적으로 만들었음 — 인스펙터 편집 불가라 시각 iteration이 힘들어 씬 배치로 마이그레이션함)
   void ShowLockOverlay()
@@ -251,11 +252,22 @@ public class LivesSystem : MonoBehaviour
   void UpdateRecoveryTimerText()
   {
     if (recoveryTimerText == null) return;
+
+    // 씬 구조 가정: Canvas → TimerBorder(이미지) → Timer(text). text의 parent = TimerBorder.
+    // 하트 3 이상이면 이미지 포함 컨테이너 통째로 숨김 → 회복 중일 때만 툭 나타남 (00:00 대신).
+    // 구조 변경 시 이 라인 재검토 필요.
+    GameObject timerGroup = recoveryTimerText.transform.parent != null
+      ? recoveryTimerText.transform.parent.gameObject
+      : recoveryTimerText.gameObject;
+
     if (current >= BaseLives || lastLostAt <= 0)
     {
-      recoveryTimerText.text = "";
+      if (timerGroup.activeSelf) timerGroup.SetActive(false);
       return;
     }
+
+    if (!timerGroup.activeSelf) timerGroup.SetActive(true);
+
     long remain = RecoverIntervalMs - (NowMs() - lastLostAt);
     if (remain < 0) remain = 0;
     int mins = (int)(remain / 60000);
