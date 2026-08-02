@@ -38,6 +38,9 @@ public class GameManager : MonoBehaviour
   int clearedCount = 0;   // 지금까지 클리어한 판 수 (진행도 표시에 사용)
   bool[] cleared;         // asset index별 클리어 여부
 
+  // 100판 완주 여부. 설정창 "인증코드 보기" 버튼 조건부 노출에 사용.
+  public bool IsAllCleared => clearedCount >= TotalDisplayLevels;
+
   void Start()
   {
     Application.targetFrameRate = 60;
@@ -288,6 +291,23 @@ public class GameManager : MonoBehaviour
   {
     if (rewardManager != null) rewardManager.ShowReward();
     else Debug.LogWarning("rewardManager 인스펙터 연결 필요");
+  }
+
+  // 에디터 전용: 100판 완주 상태로 강제 세팅. 설정창 "인증코드 보기" 버튼 노출 조건 만족용.
+  // 실행 후 설정창 열면 IsAllCleared=true라 버튼이 뜸.
+  [ContextMenu("[TEST] Simulate All Cleared")]
+  void TestSimulateAllCleared()
+  {
+    if (cleared == null || cleared.Length == 0)
+    {
+      Debug.LogWarning("cleared 배열 초기화 안 됨. 플레이 모드에서 실행하세요.");
+      return;
+    }
+    int cap = Mathf.Min(cleared.Length, TotalDisplayLevels);
+    for (int i = 0; i < cap; i++) cleared[i] = true;
+    clearedCount = TotalDisplayLevels;
+    SaveProgress();
+    Debug.Log("100판 완주 상태로 세팅됨 (IsAllCleared=true). 설정창 열어서 인증코드 보기 버튼 확인.");
   }
 #endif
 

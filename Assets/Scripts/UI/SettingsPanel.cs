@@ -5,13 +5,15 @@ using UnityEngine.UIElements;
 // UIDocument 컴포넌트가 같은 오브젝트에 있어야 동작함
 public class SettingsPanel : MonoBehaviour
 {
-  public GameManager gameManager;  // 진행 초기화용. 인스펙터에서 GameManager 오브젝트 연결
+  public GameManager gameManager;      // 진행 초기화용. 인스펙터에서 GameManager 오브젝트 연결
+  public RewardManager rewardManager;  // 100판 완주자의 인증코드 재열람용. 인스펙터에서 RewardUI 연결
 
   VisualElement root;
   VisualElement overlay;
   Toggle soundToggle;
   Toggle vibrationToggle;
   Toggle notificationToggle;
+  Button rewardButton;
 
   void Start()
   {
@@ -23,6 +25,7 @@ public class SettingsPanel : MonoBehaviour
     soundToggle = root.Q<Toggle>("sound-toggle");
     vibrationToggle = root.Q<Toggle>("vibration-toggle");
     notificationToggle = root.Q<Toggle>("notification-toggle");
+    rewardButton = root.Q<Button>("reward-button");
     var closeButton = root.Q<Button>("close-button");
 
     // 저장된 설정 값으로 토글 초기화 (체크 = 켜짐)
@@ -36,6 +39,7 @@ public class SettingsPanel : MonoBehaviour
     notificationToggle.RegisterValueChangedCallback(evt => SettingsManager.Instance.SetNotification(evt.newValue));
     closeButton.clicked += Close;
     root.Q<Button>("reset-button").clicked += ResetProgress;
+    rewardButton.clicked += OnRewardButtonClicked;
 
     overlay.style.display = DisplayStyle.None;  // 시작 시 닫혀 있음
     // 닫힌 상태에서 rootVisualElement가 풀스크린 터치를 가로채지 않도록 Ignore 처리
@@ -53,6 +57,14 @@ public class SettingsPanel : MonoBehaviour
     soundToggle.value = SettingsManager.Instance.SoundOn;
     vibrationToggle.value = SettingsManager.Instance.VibrationOn;
     notificationToggle.value = SettingsManager.Instance.NotificationOn;
+
+    // 코드 발급 이력이 있는 유저(로컬 코드 존재)에게만 재열람 버튼 노출.
+    // IsAllCleared 대신 로컬 코드 유무로 판단하는 이유: 팝업의 [1레벨로 돌아가기]가 진행도를
+    // 리셋해도 예전에 받은 코드는 계속 볼 수 있어야 함. gameManager.IsAllCleared는 현재 진행도만
+    // 반영해서 리셋 후엔 false가 되므로 부적합.
+    bool showReward = rewardManager != null && !string.IsNullOrEmpty(rewardManager.GetLocalCode());
+    rewardButton.style.display = showReward ? DisplayStyle.Flex : DisplayStyle.None;
+
     root.pickingMode = PickingMode.Position;  // 패널 내부 버튼이 터치를 받을 수 있도록 복구
     overlay.style.display = DisplayStyle.Flex;
   }
@@ -68,5 +80,12 @@ public class SettingsPanel : MonoBehaviour
   {
     Close();
     if (gameManager != null) gameManager.ResetAndRestart();
+  }
+
+  // 설정창 닫고 리워드 팝업 열기. RewardManager.ShowReward()가 로컬/서버 상태에 따라 자동 분기함.
+  void OnRewardButtonClicked()
+  {
+    Close();
+    if (rewardManager != null) rewardManager.ShowReward();
   }
 }

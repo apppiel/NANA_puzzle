@@ -85,6 +85,27 @@
     -unity-background-image-tint-color: rgba(0, 0, 0, 0);
 }
 
+/* 인증코드 보기 버튼 — 100판 완주자만 노출. close/reset과 구분되게 진한 로즈 톤 */
+.reward-button {
+    margin-top: 12px;
+    background-color: rgb(233, 76, 92);
+    color: rgb(255, 255, 255);
+    border-radius: 16px;
+    padding-top: 18px;
+    padding-bottom: 18px;
+    border-width: 0;
+    font-size: 24px;
+    -unity-font-style: bold;
+}
+
+.reward-button:hover {
+    background-color: rgb(215, 60, 76);
+}
+
+.reward-button:active {
+    background-color: rgb(190, 45, 60);
+}
+
 /* 닫기 버튼 */
 .close-button {
     margin-top: 12px;

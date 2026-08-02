@@ -27,6 +27,9 @@
                 <ui:Toggle name="notification-toggle" class="setting-toggle" />
             </ui:VisualElement>
 
+            <!-- 100판 완주자 전용. SettingsPanel.cs가 gameManager.IsAllCleared 체크해서 표시. -->
+            <ui:Button name="reward-button" text="인증코드 보기" class="reward-button" style="display: none;" />
+
             <ui:Button name="close-button" text="닫기" class="close-button" />
             <ui:Button name="reset-button" text="1레벨부터 다시" class="reset-button" />
 

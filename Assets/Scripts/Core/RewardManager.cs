@@ -7,12 +7,39 @@ using Firebase;
 using Firebase.Firestore;
 using Firebase.Extensions;
 
+// 인증코드 발급 + Firestore 저장 + 설정창에서 재열람 지원.
+//
+// 설계 원칙 (2026-08-03 재작성):
+//  1) 어떤 경우에도 유저는 코드를 받아야 한다. 초기화/저장 실패해도 로컬에서 발급해 표시.
+//  2) 로컬 저장(PlayerPrefs)이 진짜 소스. Firestore는 웹 검증용 사본.
+//  3) 서버 미동기화 상태면 앱 실행 때마다 백그라운드로 자동 재시도.
+//  4) 팝업은 절대 락다운되지 않는다. restart 버튼 항상 활성화, 모든 대기에 타임아웃.
+//
+// 이전 버전(v1.0.7)의 결함:
+//  - FirebaseApp.CheckAndFixDependenciesAsync()가 특정 유저 환경에서 hang → 콜백 안 옴
+//  - initTask.Result 접근 시 예외 → ContinueWithOnMainThread에서 조용히 삼킴 (IsFaulted 미체크)
+//  - restart 버튼도 저장 완료 전엔 잠금 → 유저 탈출 불가 락다운
+//  - 저장 실패 시 코드 표시 안 함 → 유저가 코드조차 못 봄
 public class RewardManager : MonoBehaviour
 {
     public GameManager gameManager;  // 레벨 이동용. 인스펙터에서 연결
 
-    // 저장이 확실히 끝난 뒤에만 코드 보여주기 위한 타임아웃 (Firestore 조회+저장 왕복 대기)
-    const float SaveTimeoutSeconds = 15f;
+#if UNITY_EDITOR
+    [Header("에디터 전용 (빌드에는 영향 없음)")]
+    [Tooltip("체크하면 Firebase 초기화 실패로 강제 처리 → 로컬 fallback 흐름 검증")]
+    public bool editorSimulateInitFail;
+    [Tooltip("체크하면 Firestore 저장 실패로 강제 처리 → 미동기화 안내/재시도 검증")]
+    public bool editorSimulateSaveFail;
+#endif
+
+    // 로컬 저장 키 (PlayerPrefs)
+    const string LocalCodeKey       = "rewardCode";       // 발급된 코드 문자열
+    const string LocalCodeSyncedKey = "rewardCodeSynced"; // 서버 저장 성공 여부 (0/1)
+
+    // 대기 타임아웃 (Firebase가 hang 걸리는 환경 대응)
+    const float InitTimeoutSeconds  = 12f;   // 초기화 완료 대기
+    const float QueryTimeoutSeconds = 10f;   // Firestore 조회
+    const float SaveTimeoutSeconds  = 10f;   // Firestore 저장
 
     VisualElement root;
     VisualElement overlay;
@@ -21,20 +48,18 @@ public class RewardManager : MonoBehaviour
     Button copyButton;
     Button retryButton;
     Button restartButton;
-    string currentCode = "";  // CopyCode()에서 클립보드에 넣을 코드값 보관
+    string currentCode = "";
 
     FirebaseFirestore db;
-    // Firebase 초기화 Task를 필드로 보관해서 ShowReward가 항상 대기할 수 있게 함
-    // (기존 firebaseReady 부울 방식은 초기화 완료 전에 ShowReward 호출되면 저장을 스킵해서 rewards 문서가 안 만들어지는 버그가 있었음)
-    Task<DependencyStatus> initTask;
+    Task<DependencyStatus> initTask;  // Firebase 초기화 Task (필드로 보관해 상태 폴링)
 
-    bool isProcessing = false;   // 중복 실행 방지
-    Coroutine timeoutCoroutine;  // 응답 지연 감시
+    bool isProcessing = false;         // 팝업 흐름 중복 진입 방지
+    Coroutine activeCoroutine;         // 진행 중인 발급/재시도 코루틴 (Show 재호출 시 취소)
 
     void Start()
     {
         root = GetComponent<UIDocument>().rootVisualElement;
-        root.pickingMode = PickingMode.Ignore;  // 패널 닫힌 동안 터치 차단 방지
+        root.pickingMode = PickingMode.Ignore;
 
         overlay      = root.Q<VisualElement>("overlay");
         codeLabel    = root.Q<Label>("code-text");
@@ -47,202 +72,267 @@ public class RewardManager : MonoBehaviour
         retryButton.clicked   += OnRetry;
         restartButton.clicked += OnRestartFromLevel1;
 
-        // Firebase 초기화. 앱 실행 시 자동으로 한 번만 수행됨
+        // Firebase 상세 로그 활성화 — 다음 유저 리포트 시 adb logcat에서 초기화 실패 원인 진단용.
+        // (프로덕션 성능 영향 미미. Firebase 내부 로그라 정상 흐름엔 노이즈만 있음.)
+        FirebaseApp.LogLevel = LogLevel.Debug;
+
+        // Firebase 초기화 시작. Task 자체는 hang될 수 있어서 코루틴에서 IsCompleted로 폴링.
         initTask = FirebaseApp.CheckAndFixDependenciesAsync();
         initTask.ContinueWithOnMainThread(task =>
         {
-            if (task.Result == DependencyStatus.Available)
+            // Faulted 케이스를 먼저 잡아야 함. Task.Result 접근이 AggregateException 던지면
+            // ContinueWithOnMainThread 콜백 안에서 예외 발생 → 후속 로직 조용히 종료됨.
+            if (task.IsFaulted)
             {
-                db = FirebaseFirestore.DefaultInstance;
-                Debug.Log("Firebase Firestore 준비 완료");
+                Debug.LogError("Firebase 초기화 예외: " + task.Exception);
+                return;
             }
-            else
+            if (task.Result != DependencyStatus.Available)
             {
                 Debug.LogError("Firebase 초기화 실패: " + task.Result);
+                return;
             }
+            db = FirebaseFirestore.DefaultInstance;
+            Debug.Log("Firebase Firestore 준비 완료");
         });
+
+        // 로컬엔 코드 있는데 서버 저장 안 된 상태면 앱 실행 시 조용히 재시도.
+        // 유저 개입 없이 자동 복구되는 게 목표. 실패해도 사용자 UI 영향 없음.
+        if (!string.IsNullOrEmpty(GetLocalCode()) && !IsLocalCodeSynced())
+        {
+            StartCoroutine(StartupBackgroundSync());
+        }
     }
 
-    // 모든 레벨 클리어 시 GameManager에서 호출
+    // ─── Public API ─────────────────────────────────────────────
+
+    // 로컬에 저장된 코드 (없으면 빈 문자열). 설정창에서 100판 완주자 여부 판단에도 사용 가능.
+    public string GetLocalCode() => PlayerPrefs.GetString(LocalCodeKey, "");
+
+    // 서버 저장 성공 여부. false면 웹 검증에 아직 사용 불가.
+    public bool IsLocalCodeSynced() => PlayerPrefs.GetInt(LocalCodeSyncedKey, 0) == 1;
+
+    // 100판 완주 시 (GameManager) 또는 설정창 "인증코드 보기" 눌렀을 때 호출.
+    // 로컬 코드 유무·동기화 상태에 따라 자동 분기.
     public void ShowReward()
     {
-        if (isProcessing) return;  // 중복 방지 (재클리어 연타 등)
-        isProcessing = true;
+        // 이미 팝업 열려 있고 처리 중이면 재입장 무시. 다만 팝업이 닫힌 상태에서 재호출은 허용.
+        if (isProcessing && overlay.style.display == DisplayStyle.Flex) return;
 
-        // 팝업 즉시 열되, 코드는 저장 성공한 뒤에만 표시
+        isProcessing = true;
         root.pickingMode = PickingMode.Position;
         overlay.style.display = DisplayStyle.Flex;
 
         BeginLoadingUI();
 
-        // 초기화가 아직 안 끝났으면 여기서 대기. 이미 끝났으면 즉시 다음 단계로 이어짐
-        initTask.ContinueWithOnMainThread(initT =>
+        string localCode = GetLocalCode();
+        if (!string.IsNullOrEmpty(localCode))
         {
-            if (initT.Result != DependencyStatus.Available || db == null)
+            // 로컬에 이미 있음 → 즉시 표시 (락다운 없음)
+            DisplayCode(localCode);
+            EnableCopy();
+            if (IsLocalCodeSynced())
             {
-                FailWithRetry("네트워크 상태를 확인한 뒤 다시 시도해 주세요");
-                return;
+                SetStatus("발급된 코드입니다");
+                isProcessing = false;
             }
-            FetchOrCreateCode();
-        });
+            else
+            {
+                // 서버 저장 아직 안 됨 → 백그라운드로 조용히 재시도. UI는 이미 코드 보여주고 있음.
+                SetStatus("서버 저장 확인 중...");
+                activeCoroutine = StartCoroutine(SyncExistingCodeCoroutine(localCode));
+            }
+            return;
+        }
+
+        // 로컬에 없음 → 신규 발급 흐름 (Firestore 조회 + 저장, 실패 시 fallback)
+        activeCoroutine = StartCoroutine(IssueFlowCoroutine());
     }
 
-    // 저장 로직 본체. 재시도 버튼도 이 메서드를 다시 호출함
-    void FetchOrCreateCode()
-    {
-        StartTimeoutWatchdog();
+    // ─── 발급/저장 코루틴 ────────────────────────────────────────
 
-        // 기기 고유 ID를 문서 키로 사용해 중복 발급 방지
+    // 신규 발급 흐름. Firestore 조회 → 있으면 재사용, 없으면 생성 + 저장.
+    // 어느 단계든 실패하면 로컬 발급으로 폴백해 코드는 반드시 보여줌.
+    IEnumerator IssueFlowCoroutine()
+    {
+        // 초기화 완료 대기 (자체 타임아웃 있음, Firebase Task가 hang 걸려도 여기서 탈출)
+        yield return WaitForTaskOrTimeout(initTask, InitTimeoutSeconds);
+
+        if (!IsFirebaseUsable())
+        {
+            // 초기화 실패/타임아웃 → 로컬 fallback. 코드는 보여주고 나중에 자동 재시도.
+            FallbackIssueLocal("서버 연결 실패 - 코드를 꼭 스크린샷 해두세요");
+            yield break;
+        }
+
         string deviceId = SystemInfo.deviceUniqueIdentifier;
 
-        db.Collection("rewards").Document(deviceId).GetSnapshotAsync().ContinueWithOnMainThread(getTask =>
+        // 이미 발급된 코드 조회
+        var getTask = db.Collection("rewards").Document(deviceId).GetSnapshotAsync();
+        yield return WaitForTaskOrTimeout(getTask, QueryTimeoutSeconds);
+
+        if (!getTask.IsCompleted || getTask.IsFaulted || getTask.IsCanceled)
         {
-            if (getTask.IsFaulted || getTask.IsCanceled)
-            {
-                Debug.LogError("rewards GetSnapshot 실패: " + getTask.Exception);
-                FailWithRetry("코드 확인에 실패했어요. 다시 시도해 주세요");
-                return;
-            }
+            Debug.LogError("rewards 조회 실패: " + (getTask.Exception?.ToString() ?? "타임아웃"));
+            FallbackIssueLocal("서버 응답 없음 - 코드를 꼭 스크린샷 해두세요");
+            yield break;
+        }
 
-            if (getTask.Result.Exists)
-            {
-                // 기존 코드 재사용 (같은 기기로 재클리어 시). 이 경로는 이미 저장돼있으니 저장 재시도 불필요
-                Succeed(getTask.Result.GetValue<string>("code"), "이미 발급된 코드입니다");
-                return;
-            }
-
-            // 새 코드 생성 후 Firestore에 저장
-            string newCode = GenerateCode();
-
-            var data = new Dictionary<string, object>
-            {
-                { "code",      newCode },
-                { "claimed",   false },
-                { "deviceId",  deviceId },
-                { "createdAt", FieldValue.ServerTimestamp }
-            };
-
-            // rewards: 중복 발급 방지용(기기ID 키)
-            // code_index: 웹에서 코드 검증용(코드 키). 웹은 존재 여부만 확인하지만
-            //   나중 CS 대응 위해 deviceId·createdAt 함께 저장
-            var indexData = new Dictionary<string, object>
-            {
-                { "deviceId",  deviceId },
-                { "createdAt", FieldValue.ServerTimestamp }
-            };
-
-            // WriteBatch로 원자적 커밋. 둘 다 성공하거나 둘 다 실패 — 부분 실패 상태가 원천 봉쇄됨.
-            // (이전엔 Task.WhenAll로 따로 SetAsync 후 대기했는데, rewards만 저장되고 code_index가 실패하면
-            //  유저는 코드 받는데 웹 검증은 실패하는 유령 코드가 발생했었음)
-            var batch = db.StartBatch();
-            batch.Set(db.Collection("rewards").Document(deviceId), data);
-            batch.Set(db.Collection("code_index").Document(newCode), indexData);
-
-            batch.CommitAsync().ContinueWithOnMainThread(saveTask =>
-            {
-                if (saveTask.IsCompletedSuccessfully)
-                {
-                    Succeed(newCode, "코드가 발급되었습니다!");
-                }
-                else
-                {
-                    // 실패 원인 진단용 상세 로그. 지금까진 이걸 삼켜서 원인 파악이 안 됐음
-                    Debug.LogError("코드 저장 실패: " + saveTask.Exception);
-                    FailWithRetry("저장에 실패했어요. 다시 시도해 주세요");
-                }
-            });
-        });
-    }
-
-    // "다시 시도" 버튼
-    void OnRetry()
-    {
-        if (isProcessing) return;
-        isProcessing = true;
-        BeginLoadingUI();
-        // 초기화가 실패한 상태에서 [다시 시도] 눌린 케이스도 커버
-        initTask.ContinueWithOnMainThread(initT =>
+        if (getTask.Result.Exists)
         {
-            if (initT.Result != DependencyStatus.Available || db == null)
-            {
-                FailWithRetry("네트워크 상태를 확인한 뒤 다시 시도해 주세요");
-                return;
-            }
-            FetchOrCreateCode();
-        });
+            // 서버에 이미 있음 → 그거 로컬에도 저장하고 표시
+            string existingCode = getTask.Result.GetValue<string>("code");
+            SaveLocalCode(existingCode, synced: true);
+            DisplayCode(existingCode);
+            EnableCopy();
+            SetStatus("이미 발급된 코드입니다");
+            isProcessing = false;
+            activeCoroutine = null;
+            yield break;
+        }
+
+        // 새 코드 생성. 로컬 먼저 저장(synced=false) 후 서버 저장 시도.
+        // 순서 중요: 서버 저장 도중 앱 종료돼도 로컬엔 남아있어 다음 실행 시 백그라운드 재시도됨.
+        string newCode = GenerateCode();
+        SaveLocalCode(newCode, synced: false);
+        DisplayCode(newCode);
+        EnableCopy();
+        SetStatus("서버에 저장 중...");
+
+        yield return SaveToServerCoroutine(newCode, deviceId, isForeground: true);
     }
 
-    void BeginLoadingUI()
+    // 서버에 코드 저장. rewards + code_index 원자적 커밋. 실패해도 로컬은 유지.
+    // isForeground=true면 UI 상태 갱신, false면 백그라운드 조용히 수행.
+    IEnumerator SaveToServerCoroutine(string code, string deviceId, bool isForeground)
     {
-        currentCode = "";
-        if (codeLabel != null) codeLabel.text = "- - - - -";
-        SetStatus("코드 생성 중...");
-        retryButton.style.display = DisplayStyle.None;
-        // 저장 완료 전엔 유저가 팝업 못 넘기게 잠금 (코드 못 본 채 넘어가면 위험)
-        copyButton.SetEnabled(false);
-        restartButton.SetEnabled(false);
-    }
-
-    void Succeed(string code, string message)
-    {
-        CancelTimeoutWatchdog();
-        ShowCode(code);
-        SetStatus(message);
-        retryButton.style.display = DisplayStyle.None;
-        copyButton.SetEnabled(true);
-        restartButton.SetEnabled(true);
-        isProcessing = false;
-    }
-
-    void FailWithRetry(string message)
-    {
-        CancelTimeoutWatchdog();
-        if (codeLabel != null) codeLabel.text = "- - - - -";
-        SetStatus(message);
-        retryButton.style.display = DisplayStyle.Flex;
-        // 실패 상태에선 코드 없으니 복사는 여전히 잠금. 유저가 나갈 수 있게 restart는 열어둠
-        copyButton.SetEnabled(false);
-        restartButton.SetEnabled(true);
-        isProcessing = false;
-    }
-
-    void StartTimeoutWatchdog()
-    {
-        CancelTimeoutWatchdog();
-        timeoutCoroutine = StartCoroutine(TimeoutRoutine());
-    }
-
-    void CancelTimeoutWatchdog()
-    {
-        if (timeoutCoroutine != null)
+        var data = new Dictionary<string, object>
         {
-            StopCoroutine(timeoutCoroutine);
-            timeoutCoroutine = null;
+            { "code",      code },
+            { "claimed",   false },
+            { "deviceId",  deviceId },
+            { "createdAt", FieldValue.ServerTimestamp }
+        };
+        var indexData = new Dictionary<string, object>
+        {
+            { "deviceId",  deviceId },
+            { "createdAt", FieldValue.ServerTimestamp }
+        };
+
+        // WriteBatch로 원자적 커밋. rewards만 저장되고 code_index가 실패하면
+        // 웹 검증에서 유효하지 않은 유령 코드가 만들어짐 → 둘 다 성공 or 둘 다 실패로 통일.
+        var batch = db.StartBatch();
+        batch.Set(db.Collection("rewards").Document(deviceId), data);
+        batch.Set(db.Collection("code_index").Document(code), indexData);
+        var saveTask = batch.CommitAsync();
+
+        yield return WaitForTaskOrTimeout(saveTask, SaveTimeoutSeconds);
+
+        bool ok = saveTask.IsCompleted && !saveTask.IsFaulted && !saveTask.IsCanceled;
+#if UNITY_EDITOR
+        if (editorSimulateSaveFail) ok = false;
+#endif
+        if (ok)
+        {
+            SaveLocalCode(code, synced: true);
+            if (isForeground)
+            {
+                SetStatus("코드가 발급되었습니다!");
+                isProcessing = false;
+                activeCoroutine = null;
+            }
+        }
+        else
+        {
+            Debug.LogError("코드 저장 실패: " + (saveTask.Exception?.ToString() ?? "타임아웃"));
+            // 로컬엔 이미 저장돼 있음(synced=false). 다음 실행에서 자동 재시도 or 유저가 [다시 시도] 클릭.
+            if (isForeground)
+            {
+                SetStatus("서버 저장 실패 - 코드를 꼭 스크린샷 해두세요");
+                retryButton.style.display = DisplayStyle.Flex;
+                isProcessing = false;
+                activeCoroutine = null;
+            }
         }
     }
 
-    IEnumerator TimeoutRoutine()
+    // 이미 로컬에 있는 미동기화 코드를 서버 저장 시도 (팝업 표시 상태에서).
+    // 조회는 스킵 — 이미 로컬에서 발급했으므로 해당 기기의 소유 코드가 확정된 상태.
+    IEnumerator SyncExistingCodeCoroutine(string code)
     {
-        yield return new WaitForSeconds(SaveTimeoutSeconds);
-        // 이 코루틴이 살아있는 채로 여기 도달했다 = Succeed/FailWithRetry가 아직 안 불렸다
-        timeoutCoroutine = null;
-        FailWithRetry("응답이 지연되고 있어요. 다시 시도해 주세요");
+        yield return WaitForTaskOrTimeout(initTask, InitTimeoutSeconds);
+
+        if (!IsFirebaseUsable())
+        {
+            SetStatus("서버 연결 실패 - 코드를 꼭 스크린샷 해두세요");
+            retryButton.style.display = DisplayStyle.Flex;
+            isProcessing = false;
+            activeCoroutine = null;
+            yield break;
+        }
+
+        yield return SaveToServerCoroutine(code, SystemInfo.deviceUniqueIdentifier, isForeground: true);
     }
 
-    // "1레벨로 돌아가기" 버튼
-    public void OnRestartFromLevel1()
+    // 앱 시작 시 조용히 도는 백그라운드 동기화. 유저 UI 영향 없음.
+    // 로컬엔 있는데 서버엔 없는 상태를 자연 복구하기 위함.
+    IEnumerator StartupBackgroundSync()
     {
-        overlay.style.display = DisplayStyle.None;
-        root.pickingMode = PickingMode.Ignore;
-        if (gameManager != null) gameManager.GoToLevel1();
+        yield return WaitForTaskOrTimeout(initTask, InitTimeoutSeconds);
+        if (!IsFirebaseUsable()) yield break;
+
+        string code = GetLocalCode();
+        if (string.IsNullOrEmpty(code) || IsLocalCodeSynced()) yield break;
+
+        yield return SaveToServerCoroutine(code, SystemInfo.deviceUniqueIdentifier, isForeground: false);
     }
 
-    // "코드 복사하기" 버튼
-    public void CopyCode()
+    // Task 완료 or 타임아웃 중 먼저 도달하는 쪽까지 대기.
+    // Firebase Task가 hang 걸릴 수 있어서 자체 타임아웃 필수. Task.WhenAny+Task.Delay 대신
+    // 코루틴 폴링으로 MainThread 컨텍스트 유지 (Unity API 접근 안전).
+    IEnumerator WaitForTaskOrTimeout(Task task, float timeoutSec)
     {
-        if (string.IsNullOrEmpty(currentCode)) return;
-        GUIUtility.systemCopyBuffer = currentCode;
-        SetStatus("클립보드에 복사되었습니다!", green: true);
+        float elapsed = 0f;
+        while (!task.IsCompleted && elapsed < timeoutSec)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+    }
+
+    // Firebase가 사용 가능한 상태인지 최종 체크. IsCompletedSuccessfully만 봐선 부족 —
+    // Result 접근이 AggregateException 던질 수 있어서 IsFaulted도 명시 체크.
+    bool IsFirebaseUsable()
+    {
+#if UNITY_EDITOR
+        if (editorSimulateInitFail) return false;
+#endif
+        if (initTask == null || !initTask.IsCompleted) return false;
+        if (initTask.IsFaulted || initTask.IsCanceled) return false;
+        if (initTask.Result != DependencyStatus.Available) return false;
+        return db != null;
+    }
+
+    // ─── Fallback / 발급 유틸 ─────────────────────────────────
+
+    // 서버 없이 로컬만으로 발급. 유저는 코드를 어쨌든 받고, 서버 저장은 나중에 자동 재시도.
+    void FallbackIssueLocal(string message)
+    {
+        string newCode = GenerateCode();
+        SaveLocalCode(newCode, synced: false);
+        DisplayCode(newCode);
+        EnableCopy();
+        SetStatus(message);
+        retryButton.style.display = DisplayStyle.Flex;
+        isProcessing = false;
+        activeCoroutine = null;
+    }
+
+    void SaveLocalCode(string code, bool synced)
+    {
+        PlayerPrefs.SetString(LocalCodeKey, code);
+        PlayerPrefs.SetInt(LocalCodeSyncedKey, synced ? 1 : 0);
+        PlayerPrefs.Save();
     }
 
     // 예: A3K9-XZ21 형식. 헷갈리는 문자(0,O,1,I) 제외
@@ -257,20 +347,93 @@ public class RewardManager : MonoBehaviour
         return new string(code);
     }
 
-    void ShowCode(string code)
+    // ─── UI 상태 헬퍼 ─────────────────────────────────────────
+
+    // 팝업 열자마자 표시할 초기 상태. restart는 항상 활성 유지 (락다운 방지).
+    void BeginLoadingUI()
+    {
+        currentCode = "";
+        if (codeLabel != null) codeLabel.text = "- - - - -";
+        SetStatus("코드 확인 중...");
+        retryButton.style.display = DisplayStyle.None;
+        copyButton.SetEnabled(false);
+        restartButton.SetEnabled(true);   // ★ 락다운 방지: 이 버튼은 어떤 상태에서도 눌러서 나갈 수 있어야 함
+    }
+
+    void DisplayCode(string code)
     {
         currentCode = code;
         if (codeLabel != null) codeLabel.text = code;
+    }
+
+    void EnableCopy()
+    {
+        copyButton.SetEnabled(true);
     }
 
     void SetStatus(string msg, bool green = false)
     {
         if (statusLabel == null) return;
         statusLabel.text = msg;
-        // green=true면 status-copied 클래스 추가(초록), 아니면 제거(기본 회색)
-        if (green)
-            statusLabel.AddToClassList("status-copied");
-        else
-            statusLabel.RemoveFromClassList("status-copied");
+        if (green) statusLabel.AddToClassList("status-copied");
+        else       statusLabel.RemoveFromClassList("status-copied");
     }
+
+    // ─── 버튼 핸들러 ──────────────────────────────────────────
+
+    // [다시 시도] 버튼. 로컬 코드가 있으면 저장만 재시도, 없으면 발급부터 재시도.
+    void OnRetry()
+    {
+        if (isProcessing) return;
+        isProcessing = true;
+        retryButton.style.display = DisplayStyle.None;
+
+        string localCode = GetLocalCode();
+        if (!string.IsNullOrEmpty(localCode))
+        {
+            SetStatus("서버 저장 다시 시도 중...");
+            activeCoroutine = StartCoroutine(SyncExistingCodeCoroutine(localCode));
+        }
+        else
+        {
+            SetStatus("코드 확인 중...");
+            activeCoroutine = StartCoroutine(IssueFlowCoroutine());
+        }
+    }
+
+    // [1레벨로 돌아가기] 버튼. 언제든 눌러서 팝업 탈출 가능 (락다운 방지 안전망).
+    public void OnRestartFromLevel1()
+    {
+        if (activeCoroutine != null)
+        {
+            StopCoroutine(activeCoroutine);
+            activeCoroutine = null;
+        }
+        isProcessing = false;
+        overlay.style.display = DisplayStyle.None;
+        root.pickingMode = PickingMode.Ignore;
+        if (gameManager != null) gameManager.GoToLevel1();
+    }
+
+    // [코드 복사하기] 버튼
+    public void CopyCode()
+    {
+        if (string.IsNullOrEmpty(currentCode)) return;
+        GUIUtility.systemCopyBuffer = currentCode;
+        SetStatus("클립보드에 복사되었습니다!", green: true);
+    }
+
+#if UNITY_EDITOR
+    // 에디터 전용: 로컬에 저장된 코드/동기화 상태를 초기화.
+    // Firebase 콘솔에서 rewards/code_index 문서 삭제한 뒤 이 메뉴 실행하면 신규 발급 흐름 재현 가능.
+    // 인스펙터에서 RewardManager 컴포넌트 우클릭 → 메뉴로 실행.
+    [ContextMenu("[TEST] Clear Local Reward Code")]
+    void TestClearLocalRewardCode()
+    {
+        PlayerPrefs.DeleteKey(LocalCodeKey);
+        PlayerPrefs.DeleteKey(LocalCodeSyncedKey);
+        PlayerPrefs.Save();
+        Debug.Log("로컬 리워드 코드 삭제됨. 다음 ShowReward 호출 시 서버 조회 → 신규 발급 흐름 진행.");
+    }
+#endif
 }
