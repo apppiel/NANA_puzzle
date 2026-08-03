@@ -293,6 +293,8 @@ public class GameManager : MonoBehaviour
     ShowEditorTestLevel();
   }
 
+#endif
+
   // v1.0.10 임시 백도어: 완주자였다가 실수로 리셋된 유저 구제용.
   // 상단 하트 아이콘 10회 탭으로 트리거 (HiddenBackdoor.cs). 다음 업데이트에서 제거 예정.
   // 완주 상태로 강제 세팅 + 리워드 팝업 열기. 로컬 코드 있으면 팝업이 그거 즉시 표시,
@@ -307,6 +309,7 @@ public class GameManager : MonoBehaviour
     if (rewardManager != null) rewardManager.ShowReward();
   }
 
+#if UNITY_EDITOR
   // 에디터 전용: 100판 클리어까지 안 가고도 보상 팝업 흐름을 검증할 수 있게.
   // 인스펙터에서 GameManager 컴포넌트 우클릭 → 메뉴로 실행.
   // 첫 회는 신규 저장, 이후엔 "이미 발급됨" 경로. 재저장 검증하려면 Firestore Console에서 rewards/{deviceId} 수동 삭제 후 다시 실행.
