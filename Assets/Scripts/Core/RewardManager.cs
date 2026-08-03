@@ -23,6 +23,7 @@ using Firebase.Extensions;
 public class RewardManager : MonoBehaviour
 {
     public GameManager gameManager;  // 레벨 이동용. 인스펙터에서 연결
+    public CompletionPanel completionPanel;  // 완주 확정 화면. [닫기] 후 완주 상태면 이어서 표시. 인스펙터에서 연결
 
 #if UNITY_EDITOR
     [Header("에디터 전용 (빌드에는 영향 없음)")]
@@ -47,7 +48,7 @@ public class RewardManager : MonoBehaviour
     Label statusLabel;
     Button copyButton;
     Button retryButton;
-    Button restartButton;
+    Button closeButton;
     string currentCode = "";
 
     FirebaseFirestore db;
@@ -66,11 +67,11 @@ public class RewardManager : MonoBehaviour
         statusLabel  = root.Q<Label>("status-text");
         copyButton   = root.Q<Button>("copy-button");
         retryButton  = root.Q<Button>("retry-button");
-        restartButton= root.Q<Button>("restart-button");
+        closeButton  = root.Q<Button>("close-button");
 
-        copyButton.clicked    += CopyCode;
-        retryButton.clicked   += OnRetry;
-        restartButton.clicked += OnRestartFromLevel1;
+        copyButton.clicked  += CopyCode;
+        retryButton.clicked += OnRetry;
+        closeButton.clicked += OnClose;
 
         // Firebase 초기화. 다른 스크립트(UpdateChecker 등)가 먼저 CheckAndFixDependenciesAsync를
         // 호출 중이면 InvalidOperationException("Don't call other Firebase functions while
@@ -439,7 +440,7 @@ public class RewardManager : MonoBehaviour
         SetStatus("코드 확인 중...");
         retryButton.style.display = DisplayStyle.None;
         copyButton.SetEnabled(false);
-        restartButton.SetEnabled(true);   // ★ 락다운 방지: 이 버튼은 어떤 상태에서도 눌러서 나갈 수 있어야 함
+        closeButton.SetEnabled(true);   // ★ 락다운 방지: 이 버튼은 어떤 상태에서도 눌러서 나갈 수 있어야 함
     }
 
     void DisplayCode(string code)
@@ -483,8 +484,9 @@ public class RewardManager : MonoBehaviour
         }
     }
 
-    // [1레벨로 돌아가기] 버튼. 언제든 눌러서 팝업 탈출 가능 (락다운 방지 안전망).
-    public void OnRestartFromLevel1()
+    // [닫기] 버튼. 팝업만 닫고 아무 상태도 안 건드림. 진행도 리셋은 완주 화면의 [1레벨로 돌아가기]가 담당.
+    // 완주 상태(clearedCount>=100 + 로컬 코드 있음)면 이어서 완주 화면 표시.
+    public void OnClose()
     {
         if (activeCoroutine != null)
         {
@@ -494,7 +496,15 @@ public class RewardManager : MonoBehaviour
         isProcessing = false;
         overlay.style.display = DisplayStyle.None;
         root.pickingMode = PickingMode.Ignore;
-        if (gameManager != null) gameManager.GoToLevel1();
+
+        // 완주자면 자연스레 완주 화면으로 인계.
+        if (completionPanel != null
+            && gameManager != null
+            && gameManager.IsAllCleared
+            && !string.IsNullOrEmpty(GetLocalCode()))
+        {
+            completionPanel.Show();
+        }
     }
 
     // [코드 복사하기] 버튼

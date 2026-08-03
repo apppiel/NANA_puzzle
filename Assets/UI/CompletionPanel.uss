@@ -1,0 +1,77 @@
+/* CompletionPanel 스타일 — RewardPanel과 톤 통일 */
+
+.overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    align-items: center;
+    justify-content: center;
+}
+
+.panel-card {
+    background-color: rgb(255, 255, 255);
+    border-radius: 32px;
+    padding: 56px 60px;
+    width: 680px;
+    align-items: stretch;
+}
+
+.emoji {
+    font-size: 62px;
+    -unity-text-align: upper-center;
+    margin-bottom: 4px;
+}
+
+.title {
+    font-size: 36px;
+    -unity-font-style: bold;
+    -unity-text-align: upper-center;
+    color: rgb(60, 60, 60);
+    margin-bottom: 10px;
+    white-space: normal;
+}
+
+.subtitle {
+    font-size: 24px;
+    color: rgb(160, 160, 160);
+    -unity-text-align: upper-center;
+    margin-bottom: 34px;
+}
+
+/* 본문 안내 문구 — 여러 줄 지원, 중앙 정렬 */
+.body {
+    font-size: 22px;
+    color: rgb(90, 90, 90);
+    -unity-text-align: upper-center;
+    white-space: normal;
+    margin-bottom: 34px;
+    /* 줄 간격 확보 위해 padding 살짝 */
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.btn {
+    border-radius: 16px;
+    padding-top: 22px;
+    padding-bottom: 22px;
+    border-width: 0;
+    font-size: 26px;
+    -unity-font-style: bold;
+    margin-bottom: 0;
+}
+
+.btn-primary {
+    background-color: rgb(255, 138, 138);
+    color: rgb(255, 255, 255);
+}
+
+.btn-primary:hover {
+    background-color: rgb(255, 110, 110);
+}
+
+.btn-primary:active {
+    background-color: rgb(230, 90, 90);
+}

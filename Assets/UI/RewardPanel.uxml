@@ -20,7 +20,8 @@
             <ui:Button name="copy-button" text="코드 복사하기" class="btn btn-copy" />
             <!-- 저장 실패 시에만 노출. 평소엔 display:none -->
             <ui:Button name="retry-button" text="다시 시도" class="btn btn-retry" style="display: none;" />
-            <ui:Button name="restart-button" text="1레벨로 돌아가기" class="btn btn-secondary" />
+            <!-- [닫기]는 아무 상태도 안 건드리고 팝업만 닫음. 완주 상태면 RewardManager가 이어서 CompletionPanel 띄움 -->
+            <ui:Button name="close-button" text="닫기" class="btn btn-secondary" />
 
         </ui:VisualElement>
     </ui:VisualElement>

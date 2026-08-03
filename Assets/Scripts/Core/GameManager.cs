@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour
   public TMP_Text levelText;         // 진행도 표시용 (예: "42 / 100")
   public TMP_Text roundCountText;    // 진행도 표시용 (예: "42 / 100")
   public RewardManager rewardManager; // 모든 레벨 클리어 시 보상 처리. 인스펙터에서 연결
+  public CompletionPanel completionPanel; // 완주 확정 화면. 앱 재시작 시 완주 상태면 자동 표시. 인스펙터에서 연결
   public AdManager adManager;         // 전면 광고 관리. 인스펙터에서 연결
   public LivesSystem livesSystem;     // 목숨 시스템. 리셋 이벤트 -1, 클리어 이벤트 리필
 
@@ -60,9 +61,9 @@ public class GameManager : MonoBehaviour
     if (clearedCount >= TotalDisplayLevels)
     {
       // 완주 상태로 앱 재시작: 신 로직에선 뽑을 asset이 없어 PickAndLoadNext가 아무것도 안 함 → 검은 화면 정지.
-      // 배경으로 Level_1 깔고 보상 팝업 자동 재발동. 유저는 이미 발급받은 코드 다시 보고 [1레벨로]로 리셋 가능.
+      // Level_1을 배경으로 깔고, 이미 코드 있으면 완주 화면 / 없으면 리워드 팝업 자동 재발동.
       LoadLevel(0);
-      StartCoroutine(ShowRewardAfterFrame());
+      StartCoroutine(ShowCompletionOrRewardAfterFrame());
     }
     else
     {
@@ -70,11 +71,20 @@ public class GameManager : MonoBehaviour
     }
   }
 
-  // RewardManager.Start가 먼저 돌 보장이 없어서 1프레임 양보한 뒤 팝업 호출
-  IEnumerator ShowRewardAfterFrame()
+  // RewardManager/CompletionPanel의 Start가 먼저 돌 보장이 없어서 1프레임 양보.
+  // 로컬 코드 있음 = 이미 발급받음 → 완주 화면. 없음 = 아직 받아야 함 → 리워드 팝업.
+  IEnumerator ShowCompletionOrRewardAfterFrame()
   {
     yield return null;
-    if (rewardManager != null) rewardManager.ShowReward();
+    bool alreadyIssued = rewardManager != null && !string.IsNullOrEmpty(rewardManager.GetLocalCode());
+    if (alreadyIssued)
+    {
+      if (completionPanel != null) completionPanel.Show();
+    }
+    else
+    {
+      if (rewardManager != null) rewardManager.ShowReward();
+    }
   }
 
 #if UNITY_EDITOR
@@ -281,6 +291,20 @@ public class GameManager : MonoBehaviour
   {
     yield return new WaitForSeconds(1.0f);
     ShowEditorTestLevel();
+  }
+
+  // v1.0.10 임시 백도어: 완주자였다가 실수로 리셋된 유저 구제용.
+  // 상단 하트 아이콘 10회 탭으로 트리거 (HiddenBackdoor.cs). 다음 업데이트에서 제거 예정.
+  // 완주 상태로 강제 세팅 + 리워드 팝업 열기. 로컬 코드 있으면 팝업이 그거 즉시 표시,
+  // 없으면 IssueFlowCoroutine이 서버 조회 → 신규 발급 진행.
+  public void SkipToAllClearedAndShowReward()
+  {
+    if (cleared == null || cleared.Length == 0) return;
+    int cap = Mathf.Min(cleared.Length, TotalDisplayLevels);
+    for (int i = 0; i < cap; i++) cleared[i] = true;
+    clearedCount = TotalDisplayLevels;
+    SaveProgress();
+    if (rewardManager != null) rewardManager.ShowReward();
   }
 
   // 에디터 전용: 100판 클리어까지 안 가고도 보상 팝업 흐름을 검증할 수 있게.

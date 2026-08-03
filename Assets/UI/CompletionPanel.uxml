@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="CompletionPanel.uss" />
+    <!-- display: none → ShowCompletion() 호출 시 Flex로 전환 -->
+    <ui:VisualElement name="overlay" class="overlay" style="display: none;">
+
+        <ui:VisualElement class="panel-card">
+
+            <ui:Label text="🎊" class="emoji" />
+            <ui:Label text="모든 레벨을 클리어 하셨어요!" class="title" />
+            <ui:Label text="게임을 즐겨주셔서 감사합니다!" class="subtitle" />
+
+            <ui:Label text="한 번 더 도전 하고 싶으시면 아래 버튼을 눌러주세요.&#10;단, 코드를 재발급 받으실 수는 없습니다.&#10;&#10;발급 받은 코드를 다시 보고 싶다면&#10;설정 → 인증코드 보기를 이용해주세요." class="body" />
+
+            <ui:Button name="restart-button" text="1레벨로 돌아가기" class="btn btn-primary" />
+
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
