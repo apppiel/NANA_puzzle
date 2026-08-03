@@ -128,7 +128,8 @@ public class UpdateChecker : MonoBehaviour
       new Vector2(0.5f, 0.5f),
       new Vector2(30, 0), new Vector2(-30, 0));
 
-    // 강제 업데이트라 [종료]는 앱 프로세스 종료. 다음 실행 때 Start()가 다시 돌면서 팝업도 재표시됨
+#if !UNITY_IOS
+    // Android: 강제 업데이트라 [종료]는 앱 프로세스 종료. 다음 실행 때 Start()가 다시 돌면서 팝업 재표시됨.
     AddButton(cardGo, "Close", "종료",
       new Vector2(0.05f, 0.06f), new Vector2(0.48f, 0.28f),
       new Color(0.85f, 0.85f, 0.85f), new Color(0.2f, 0.2f, 0.2f),
@@ -138,6 +139,15 @@ public class UpdateChecker : MonoBehaviour
       new Vector2(0.52f, 0.06f), new Vector2(0.95f, 0.28f),
       new Color(1f, 0.54f, 0.54f), Color.white,
       OpenStore);
+#else
+    // iOS: Apple HIG상 앱을 프로그래밍적으로 종료할 수 없음(리젝 리스크).
+    // [업데이트] 하나만 가운데에 배치 → 유저는 업데이트하거나 홈으로 나가는 두 선택지.
+    // OnApplicationPause 재검사가 있어서 백그라운드 복귀 시 팝업이 다시 뜨므로 우회 어려움.
+    AddButton(cardGo, "Update", "업데이트",
+      new Vector2(0.25f, 0.06f), new Vector2(0.75f, 0.28f),
+      new Color(1f, 0.54f, 0.54f), Color.white,
+      OpenStore);
+#endif
   }
 
   static void Stretch(RectTransform rt)
