@@ -72,16 +72,63 @@ public class RewardManager : MonoBehaviour
         retryButton.clicked   += OnRetry;
         restartButton.clicked += OnRestartFromLevel1;
 
-        // Firebase 상세 로그 활성화 — 다음 유저 리포트 시 adb logcat에서 초기화 실패 원인 진단용.
-        // (프로덕션 성능 영향 미미. Firebase 내부 로그라 정상 흐름엔 노이즈만 있음.)
-        FirebaseApp.LogLevel = LogLevel.Debug;
+        // Firebase 초기화. 다른 스크립트(UpdateChecker 등)가 먼저 CheckAndFixDependenciesAsync를
+        // 호출 중이면 InvalidOperationException("Don't call other Firebase functions while
+        // CheckDependencies is running.") 던짐. 이 경우 코루틴에서 짧게 대기하며 재시도해
+        // 다른 초기화가 끝난 뒤 성공하도록 유도. 실기에서 관찰된 초기화 hang 원인이 이거였음(2026-08-03).
+        StartCoroutine(InitializeFirebaseCoroutine());
 
-        // Firebase 초기화 시작. Task 자체는 hang될 수 있어서 코루틴에서 IsCompleted로 폴링.
-        initTask = FirebaseApp.CheckAndFixDependenciesAsync();
+        // 로컬엔 코드 있는데 서버 저장 안 된 상태면 앱 실행 시 조용히 재시도.
+        // 유저 개입 없이 자동 복구되는 게 목표. 실패해도 사용자 UI 영향 없음.
+        if (!string.IsNullOrEmpty(GetLocalCode()) && !IsLocalCodeSynced())
+        {
+            StartCoroutine(StartupBackgroundSync());
+        }
+        // v1.0.7 이하 유저 마이그레이션: 로컬엔 없지만 Firestore엔 이미 발급된 코드가 있을 수 있음.
+        // (v1.0.7 RewardManager는 PlayerPrefs 저장 없이 Firestore만 썼음.)
+        // 이 조회를 미리 해두면 ShowReward 호출 시 로컬 즉시 표시 분기를 탈 수 있어 22초 대기 회피.
+        else if (string.IsNullOrEmpty(GetLocalCode()))
+        {
+            StartCoroutine(MigrateFromServerCoroutine());
+        }
+    }
+
+    // Firebase 초기화 재시도 코루틴. UpdateChecker 등 다른 스크립트가 먼저 초기화 중이면
+    // InvalidOperationException이 나므로, 짧게 대기하며 최대 30번(=30초) 재시도.
+    // 성공하면 initTask 세팅 + ContinueWithOnMainThread로 db 준비.
+    // 최종 실패해도 IssueFlow가 IsFirebaseUsable() 체크 후 FallbackIssueLocal로 안전 종료.
+    IEnumerator InitializeFirebaseCoroutine()
+    {
+        // C# 제약: yield는 catch 블록에 못 들어감. 상태 플래그로 우회.
+        bool fatal = false;
+        for (int attempt = 1; attempt <= 30 && initTask == null && !fatal; attempt++)
+        {
+            try
+            {
+                initTask = FirebaseApp.CheckAndFixDependenciesAsync();
+                Debug.Log("Firebase CheckAndFix 시작 성공 (attempt " + attempt + ")");
+            }
+            catch (System.InvalidOperationException)
+            {
+                // 다른 스크립트가 아직 초기화 중. 1초 후 재시도.
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("Firebase 초기화 호출 예외: " + e);
+                fatal = true;
+            }
+            if (initTask == null && !fatal)
+                yield return new WaitForSecondsRealtime(1f);
+        }
+
+        if (initTask == null)
+        {
+            Debug.LogError("Firebase 초기화 재시도 실패 — 이후 흐름은 로컬 fallback으로 대체됨");
+            yield break;
+        }
+
         initTask.ContinueWithOnMainThread(task =>
         {
-            // Faulted 케이스를 먼저 잡아야 함. Task.Result 접근이 AggregateException 던지면
-            // ContinueWithOnMainThread 콜백 안에서 예외 발생 → 후속 로직 조용히 종료됨.
             if (task.IsFaulted)
             {
                 Debug.LogError("Firebase 초기화 예외: " + task.Exception);
@@ -95,13 +142,6 @@ public class RewardManager : MonoBehaviour
             db = FirebaseFirestore.DefaultInstance;
             Debug.Log("Firebase Firestore 준비 완료");
         });
-
-        // 로컬엔 코드 있는데 서버 저장 안 된 상태면 앱 실행 시 조용히 재시도.
-        // 유저 개입 없이 자동 복구되는 게 목표. 실패해도 사용자 UI 영향 없음.
-        if (!string.IsNullOrEmpty(GetLocalCode()) && !IsLocalCodeSynced())
-        {
-            StartCoroutine(StartupBackgroundSync());
-        }
     }
 
     // ─── Public API ─────────────────────────────────────────────
@@ -156,7 +196,7 @@ public class RewardManager : MonoBehaviour
     IEnumerator IssueFlowCoroutine()
     {
         // 초기화 완료 대기 (자체 타임아웃 있음, Firebase Task가 hang 걸려도 여기서 탈출)
-        yield return WaitForTaskOrTimeout(initTask, InitTimeoutSeconds);
+        yield return WaitForInitReady(InitTimeoutSeconds);
 
         if (!IsFirebaseUsable())
         {
@@ -260,7 +300,7 @@ public class RewardManager : MonoBehaviour
     // 조회는 스킵 — 이미 로컬에서 발급했으므로 해당 기기의 소유 코드가 확정된 상태.
     IEnumerator SyncExistingCodeCoroutine(string code)
     {
-        yield return WaitForTaskOrTimeout(initTask, InitTimeoutSeconds);
+        yield return WaitForInitReady(InitTimeoutSeconds);
 
         if (!IsFirebaseUsable())
         {
@@ -274,11 +314,38 @@ public class RewardManager : MonoBehaviour
         yield return SaveToServerCoroutine(code, SystemInfo.deviceUniqueIdentifier, isForeground: true);
     }
 
+    // v1.0.7 이하 유저용 마이그레이션. 로컬엔 없지만 서버엔 이미 코드가 있을 수 있어서
+    // 앱 시작 시 조용히 조회해서 로컬로 복사. 발견 못 하면(신규 유저 등) 조용히 종료.
+    // 성공하면 다음 ShowReward가 로컬 즉시 표시 분기를 탐 → 22초 대기 회피.
+    IEnumerator MigrateFromServerCoroutine()
+    {
+        yield return WaitForInitReady(InitTimeoutSeconds);
+        if (!IsFirebaseUsable()) yield break;
+
+        // 중간에 ShowReward가 IssueFlow 통해 로컬 저장했으면 이미 목적 달성 — 중복 조회 스킵
+        if (!string.IsNullOrEmpty(GetLocalCode())) yield break;
+
+        var getTask = db.Collection("rewards").Document(SystemInfo.deviceUniqueIdentifier).GetSnapshotAsync();
+        yield return WaitForTaskOrTimeout(getTask, QueryTimeoutSeconds);
+
+        if (!getTask.IsCompleted || getTask.IsFaulted || getTask.IsCanceled) yield break;
+        if (!getTask.Result.Exists) yield break;
+
+        // 다시 한 번 로컬 체크. 조회 중 ShowReward가 먼저 발급했을 수 있음.
+        if (!string.IsNullOrEmpty(GetLocalCode())) yield break;
+
+        string existingCode = getTask.Result.GetValue<string>("code");
+        if (string.IsNullOrEmpty(existingCode)) yield break;
+
+        SaveLocalCode(existingCode, synced: true);
+        Debug.Log("v1.0.7 코드 로컬 마이그레이션 완료");
+    }
+
     // 앱 시작 시 조용히 도는 백그라운드 동기화. 유저 UI 영향 없음.
     // 로컬엔 있는데 서버엔 없는 상태를 자연 복구하기 위함.
     IEnumerator StartupBackgroundSync()
     {
-        yield return WaitForTaskOrTimeout(initTask, InitTimeoutSeconds);
+        yield return WaitForInitReady(InitTimeoutSeconds);
         if (!IsFirebaseUsable()) yield break;
 
         string code = GetLocalCode();
@@ -292,8 +359,23 @@ public class RewardManager : MonoBehaviour
     // 코루틴 폴링으로 MainThread 컨텍스트 유지 (Unity API 접근 안전).
     IEnumerator WaitForTaskOrTimeout(Task task, float timeoutSec)
     {
+        // task null 방어. Start()가 예외로 중단돼 initTask가 잡히지 않은 케이스가 실기에서 재현됨.
+        // 여기서 조용히 break하면 이후 IsFirebaseUsable()이 false 반환 → FallbackIssueLocal 발동.
+        if (task == null) yield break;
         float elapsed = 0f;
         while (!task.IsCompleted && elapsed < timeoutSec)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+    }
+
+    // initTask 전용 대기. InitializeFirebaseCoroutine이 재시도 중이라 initTask 자체가 늦게 할당될 수 있음.
+    // 필드를 매 프레임 재평가하며 (할당 + 완료) 두 조건 모두 기다림.
+    IEnumerator WaitForInitReady(float timeoutSec)
+    {
+        float elapsed = 0f;
+        while ((initTask == null || !initTask.IsCompleted) && elapsed < timeoutSec)
         {
             elapsed += Time.unscaledDeltaTime;
             yield return null;

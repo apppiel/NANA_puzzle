@@ -31,8 +31,8 @@ public class GameManager : MonoBehaviour
   const int TotalDisplayLevels = 100;
 
   const string LegacyProgressKey = "currentLevel";  // 구버전 유저 마이그레이션용
-  const string ClearedCountKey   = "clearedCount";  // 지금까지 클리어한 판 수
-  const string ClearedMaskKey    = "clearedMask";   // "01010..." 형태. 각 자리 = asset index 클리어 여부
+  const string ClearedCountKey = "clearedCount";  // 지금까지 클리어한 판 수
+  const string ClearedMaskKey = "clearedMask";   // "01010..." 형태. 각 자리 = asset index 클리어 여부
 
   int currentIndex = 0;   // 지금 도전 중인 판의 asset index
   int clearedCount = 0;   // 지금까지 클리어한 판 수 (진행도 표시에 사용)
@@ -81,7 +81,7 @@ public class GameManager : MonoBehaviour
   // 에디터 테스트 모드: 진행/저장 무시. 매번 이 레벨만 다시 로드.
   void ShowEditorTestLevel()
   {
-    if (levelText != null)      levelText.text      = "TEST";
+    if (levelText != null) levelText.text = "TEST";
     if (roundCountText != null) roundCountText.text = "TEST";
     board.ShowLevel(editorTestLevel);
   }
@@ -219,7 +219,7 @@ public class GameManager : MonoBehaviour
       if (clearedCount < GroupBoundaries[g])
       {
         groupStart = GroupBoundaries[g - 1];
-        groupEnd   = GroupBoundaries[g];
+        groupEnd = GroupBoundaries[g];
         break;
       }
     }
@@ -241,7 +241,7 @@ public class GameManager : MonoBehaviour
     // asset 개수가 아니라 유저 노출 판 수(100) 기준 — 100판 완주 후 남은 그룹 D 여분 판을 풀 때는 "100 / 100" 유지
     int display = Mathf.Min(clearedCount + 1, TotalDisplayLevels);
     string progress = display + " / " + TotalDisplayLevels;
-    if (levelText != null)      levelText.text      = progress;
+    if (levelText != null) levelText.text = progress;
     if (roundCountText != null) roundCountText.text = progress;
 
     board.ShowLevel(levels[currentIndex]);
@@ -340,7 +340,7 @@ public class GameManager : MonoBehaviour
 #endif
     LoadLevel(currentIndex);
   }
-  public void GoToLevel1()   { ResetAndRestart(); }
+  public void GoToLevel1() { ResetAndRestart(); }
 
   // 설정창 "처음부터 시작" → 저장된 진행 상황을 지우고 새로 시작
   public void ResetAndRestart()
