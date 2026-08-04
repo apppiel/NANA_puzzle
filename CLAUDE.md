@@ -131,7 +131,7 @@
 - [x] 설정창 "처음부터 시작" 버튼 추가 (진행 상황 초기화 + 1레벨로 이동)
 - [x] 시작 칸 탭 시 경로 초기화 기능 제거
 - [x] 재설치 시 진행 상황 초기화 — firstInstallTime 비교로 Google 자동 백업 복원 문제 해결
-- [x] iOS ATT(App Tracking Transparency) 구현 — ATTBridge.mm(네이티브 플러그인), iOSPostBuild.cs(프레임워크 자동 링크 + Info.plist 문구 추가)
+- [x] iOS ATT(App Tracking Transparency) 구현 — ATTBridge.mm(네이티브 플러그인), iOSPostBuild.cs(프레임워크 자동 링크 + Info.plist 문구 추가 + Unity Ads SKAdNetwork ID 병합)
 - [x] iOS App Store 심사 제출 (v1.0 build 1)
 - [x] iOS App Store 출시 완료 (v1.0)
 - [x] AdMob 앱 등록 (iOS 출시 후 광고 미노출 → 등록으로 해결)
@@ -181,14 +181,14 @@
 - [x] Android v1.0.8 빌드 & 프로덕션 배포 (2026-08-03) — bundleVersion 1.0.8, AndroidBundleVersionCode 11. Play Console 프로덕션 트랙 직접 배포. 내부 테스트 우회는 발주자 결정(리스크 수용). 배포 후 두 유저 실기 검증 대기
 - [x] UpdateChecker iOS 분기 — Apple HIG상 `Application.Quit` 리젝 리스크로 iOS 빌드에선 [종료] 버튼 제외, [업데이트] 하나만 가운데(폭 50%) 배치. `#if !UNITY_IOS`로 Android [종료]/[업데이트] 좌우 배치는 유지. iOS 우회 차단은 `OnApplicationPause` 재검사로 대체 (2026-08-03)
 - [x] v1.0.10 하트 10탭 백도어 제거 — `Assets/Scripts/UI/HiddenBackdoor.cs`(+.meta) 삭제, `GameManager.SkipToAllClearedAndShowReward` 메서드 삭제, `SampleScene.unity`의 Heart GameObject에서 HiddenBackdoor MonoBehaviour 참조 정리. v1.0.10에서 실수로 리셋된 유저 구제용 임시 조치였고 목적 달성
+- [x] iOS Unity Ads Mediation 통합 (2026-08-04) — Unity Ads Dashboard에 iOS 앱 등록(Game ID `800111550`) + placement 2개 생성(`Interstitial_iOS`, `Rewarded_iOS`). AdMob 콘솔에 iOS 미디에이션 그룹 2개 생성(`NANA-iOS-Interstitial`, `NANA-iOS-Rewarded`) + Unity Ads(입찰) 소스 매핑. `Assets/Editor/iOSPostBuild.cs`에 Unity Ads 요구 SKAdNetwork ID 76개 병합 로직 추가(`[PostProcessBuild(999)]`로 GoogleMobileAds `PListProcessor` 뒤에 실행 + HashSet 중복 스킵으로 idempotent). Unity Ads 목록 갱신 필요 시 배열만 교체하면 됨(출처: Unity Ads Dashboard > iOS 앱 상세 > "Unity Ads SDK 3.5.1 이상용 SKAdNetwork ID" 전체 목록 버튼). Xcode 빌드 후 Info.plist에 76개 실제 반영 실측만 남음
 
 ## 다음 할 일 (TODO)
 - [x] **하트 회복 완료 로컬 알림** — Unity `com.unity.mobile.notifications` 2.4.3 도입. NotificationHelper.cs로 예약/취소 캡슐화, LivesSystem이 상태 변경 지점 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 RefreshRecoveryNotification 호출. 설정창에 알림 토글 추가(기본 ON). Android Small Icon은 흰 실루엣 하트(NotificationIconTool 에디터 메뉴로 자동 생성). 앱 실행 중 하트 3 도달 시 알림 취소는 의도된 스팸 방지 동작. 실기 검증 완료 2026-07-29
 - [ ] AdMob 콘솔 실제 Rewarded 광고 unit 활성화 확인 — 생성 직후 몇 시간 지연 있을 수 있음. `useTestAd=false` + 자기 기기 테스트 기기로 등록해서 실기 검증
 - [ ] **v1.0.8 배포 후 두 유저 실기 검증** — 업데이트 설치 요청 → 앱 실행 → 자동 리워드 팝업 fallback 발동 확인("서버 연결 실패 - 코드를 꼭 스크린샷 해두세요") → 코드 스크린샷 요청 → Firebase 콘솔에서 rewards/{기기ID}+code_index/{코드} 수동 등록(일회성). 결과 리포트로 초기화 hang 실제 원인 확정 시도. `FirebaseApp.LogLevel=Debug` 세팅됐으니 adb logcat 요청 가능하면 원인 확정 신뢰도↑
 - [ ] UpdateChecker 강제 업데이트 유도 (v1.0.8) — Firestore `config/app_version`의 `androidLatestVersion`을 1.0.8로 갱신. 기존 v1.0.7 이하 유저에게 자동 업데이트 팝업 뜸 (두 유저 포함). 미갱신 시 유저가 자발적 업데이트해야 함
-- [ ] iOS v1.0.10 빌드 & App Store 제출 — Android 1.0.10과 기능 동등. 반영 항목: 랜덤 셔플 + 캡처 방지 + 강제 업데이트(**iOS는 [업데이트] 버튼만**) + AdManager 광고 카운트/보상형 광고/Pending 흐름 + 목숨 시스템 + 셔플 그룹 확장 + RewardManager v1.0.8 재작성 + 설정창 인증코드 보기 + Firebase CheckAndFix 동시호출 방어(v1.0.9) + 완료 화면(v1.0.10). **iOS `iPhone buildNumber`를 4→5로 올릴 것**(App Store 재업로드 금지). `Application.Quit` 리젝 리스크는 UpdateChecker `#if !UNITY_IOS` 분기로 해결됨(BackButtonHandler는 iOS Escape 키 미발생으로 dead code — 무해). `activeInputHandler=0` 유지(scene EventSystem이 StandaloneInputModule 사용 중이라 문제 없음)
-- [ ] **iOS Unity Ads Mediation** — Android 통합과 동일하게 iOS 미디에이션 그룹(Interstitial/Rewarded) 생성, Unity Ads Dashboard에 iOS 앱 등록(Game ID/placements), Adapter 임포트 이미 되어있음(Platforms/iOS 폴더 포함). iOSPostBuild.cs의 SKAdNetwork 자동 반영 여부는 실제 Xcode 빌드 후 Info.plist 확인 필요
+- [ ] iOS v1.0.10 빌드 & App Store 제출 — Android 1.0.10과 기능 동등. 반영 항목: 랜덤 셔플 + 캡처 방지 + 강제 업데이트(**iOS는 [업데이트] 버튼만**) + AdManager 광고 카운트/보상형 광고/Pending 흐름 + 목숨 시스템 + 셔플 그룹 확장 + RewardManager v1.0.8 재작성 + 설정창 인증코드 보기 + Firebase CheckAndFix 동시호출 방어(v1.0.9) + 완료 화면(v1.0.10) + **Unity Ads iOS mediation + Info.plist SKAdNetwork 76개 병합**(2026-08-04). **iOS `iPhone buildNumber`를 4→5로 올릴 것**(App Store 재업로드 금지). `Application.Quit` 리젝 리스크는 UpdateChecker `#if !UNITY_IOS` 분기로 해결됨(BackButtonHandler는 iOS Escape 키 미발생으로 dead code — 무해). `activeInputHandler=0` 유지(scene EventSystem이 StandaloneInputModule 사용 중이라 문제 없음). **빌드 직후 실측**: Xcode 프로젝트 열어 Info.plist의 `SKAdNetworkItems` 배열 개수 확인(Google SDK 자동 병합 ~49개 + Unity Ads 병합분 병합해서 ~76개 이상이어야 정상)
 - [ ] **디바이스별 UI 대응 (부분 완료)** — CanvasScaler·HUD 앵커·LoadingPanel aspectRatio는 처리됨(2026-07-29). 남은 것: (a) 실기 검증(갤럭시 S22+/S25/폴더블/아이폰), (b) SettingsButton localScale 2.1757 이상값 정상화(sizeDelta로 조절), (c) Safe Area(펀치홀·노치) 대응 여부 결정, (d) BoardRenderer.FitCamera 극단 비율(폴더블) 대응 검토. 참조: [[project-device-ui-adapt]]
 
 ## 협업 방식 메모
