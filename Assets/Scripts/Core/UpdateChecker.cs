@@ -62,13 +62,12 @@ public class UpdateChecker : MonoBehaviour
       }
       if (!task.Result.Exists) return;
 
-#if UNITY_ANDROID
+#if UNITY_ANDROID || UNITY_IOS
+  #if UNITY_ANDROID
       const string fieldName = "androidLatestVersion";
-#elif UNITY_IOS
+  #else
       const string fieldName = "iosLatestVersion";
-#else
-      return;
-#endif
+  #endif
 
       var snap = task.Result;
       if (!snap.ContainsField(fieldName)) return;
@@ -78,6 +77,7 @@ public class UpdateChecker : MonoBehaviour
 
       if (IsNewer(latest, Application.version))
         ShowPopup(latest);
+#endif
     });
   }
 
