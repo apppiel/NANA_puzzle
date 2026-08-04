@@ -63,17 +63,17 @@ public class UpdateChecker : MonoBehaviour
       if (!task.Result.Exists) return;
 
 #if UNITY_ANDROID
-      const string field = "androidLatestVersion";
+      const string fieldName = "androidLatestVersion";
 #elif UNITY_IOS
-      const string field = "iosLatestVersion";
+      const string fieldName = "iosLatestVersion";
 #else
       return;
 #endif
 
       var snap = task.Result;
-      if (!snap.ContainsField(field)) return;
+      if (!snap.ContainsField(fieldName)) return;
 
-      string latest = snap.GetValue<string>(field);
+      string latest = snap.GetValue<string>(fieldName);
       if (string.IsNullOrEmpty(latest)) return;
 
       if (IsNewer(latest, Application.version))
