@@ -1,19 +1,28 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.UI;
-using Firebase;
-using Firebase.Firestore;
-using Firebase.Extensions;
 
-// 앱 시작 시 Firestore config/app_version 문서를 조회해 최신 버전을 확인.
+// 앱 시작 시 정적 JSON URL 을 조회해 최신 버전을 확인.
 // 현재 앱 버전(Player Settings의 Version)보다 최신이면 팝업 표시.
-// 팝업: [닫기]는 그냥 사라짐, [업데이트]는 스토어 열기.
+// 팝업: Android [종료]는 앱 종료, [업데이트]는 스토어 열기. iOS 는 [업데이트] 단일.
+//
+// 정적 JSON 스키마 (VersionJsonUrl 이 가리키는 파일):
+//   { "androidLatestVersion": "1.0.10", "iosLatestVersion": "1.0.3" }
+// 필드 없으면 no-op. 조회 실패 (오프라인/HTTP 에러/타임아웃) 시 30초 후 재시도.
+//
+// 예전엔 Firestore config/app_version 문서를 사용했으나 Firebase SDK 초기화 대기 + hang
+// 리스크로 팝업이 늦게/안 뜨는 이슈가 있어 정적 JSON + UnityWebRequest 로 전환.
 public class UpdateChecker : MonoBehaviour
 {
-  const string PackageName = "com.nanaBox.NANApuzzle";
-  const string IosAppId    = "6788628965";
-  const string ConfigPath  = "config/app_version";  // Firestore 문서 경로
+  const string PackageName    = "com.nanaBox.NANApuzzle";
+  const string IosAppId       = "6788628965";
+  const string VersionJsonUrl = "https://nana-no2.web.app/nana-version.json";
+  const int    RequestTimeoutSec = 5;   // HTTP 요청 타임아웃
+  const float  RetryDelaySec     = 30f; // 실패 시 재시도 간격
 
   Canvas overlayCanvas;
+  Coroutine checkRoutine;
 
   void Start()
   {
@@ -21,7 +30,7 @@ public class UpdateChecker : MonoBehaviour
     // 에디터에서는 개발 편의를 위해 업데이트 체크 스킵
     return;
 #else
-    TryCheck();
+    StartCheck();
 #endif
   }
 
@@ -29,56 +38,58 @@ public class UpdateChecker : MonoBehaviour
   void OnApplicationPause(bool paused)
   {
 #if !UNITY_EDITOR
-    if (!paused && overlayCanvas == null) TryCheck();
+    if (!paused && overlayCanvas == null) StartCheck();
 #endif
   }
 
-  // Firebase 초기화 또는 Firestore 조회 실패 시 30초 후 재시도. 중복 예약 방지 위해 CancelInvoke 선행.
-  void TryCheck()
+  // 중복 코루틴 방지 위해 기존 것 정리 후 시작
+  void StartCheck()
   {
-    CancelInvoke(nameof(TryCheck));
-    FirebaseApp.CheckAndFixDependenciesAsync().ContinueWithOnMainThread(task =>
-    {
-      if (task.Result != DependencyStatus.Available)
-      {
-        Debug.LogWarning("[UpdateChecker] Firebase 초기화 실패, 30초 후 재시도: " + task.Result);
-        Invoke(nameof(TryCheck), 30f);
-        return;
-      }
-      CheckLatestVersion();
-    });
+    if (checkRoutine != null) StopCoroutine(checkRoutine);
+    checkRoutine = StartCoroutine(CheckRoutine());
   }
 
-  void CheckLatestVersion()
+  IEnumerator CheckRoutine()
   {
-    var db = FirebaseFirestore.DefaultInstance;
-    db.Document(ConfigPath).GetSnapshotAsync().ContinueWithOnMainThread(task =>
+    using (var req = UnityWebRequest.Get(VersionJsonUrl))
     {
-      if (!task.IsCompletedSuccessfully)
+      req.timeout = RequestTimeoutSec;
+      yield return req.SendWebRequest();
+
+      if (req.result != UnityWebRequest.Result.Success)
       {
-        Debug.LogWarning("[UpdateChecker] config/app_version 조회 실패, 30초 후 재시도");
-        Invoke(nameof(TryCheck), 30f);
-        return;
+        Debug.LogWarning("[UpdateChecker] nana-version.json 조회 실패 (" + req.result + "), " + RetryDelaySec + "초 후 재시도");
+        yield return new WaitForSeconds(RetryDelaySec);
+        checkRoutine = StartCoroutine(CheckRoutine());
+        yield break;
       }
-      if (!task.Result.Exists) return;
 
-#if UNITY_ANDROID || UNITY_IOS
-  #if UNITY_ANDROID
-      const string fieldName = "androidLatestVersion";
-  #else
-      const string fieldName = "iosLatestVersion";
-  #endif
+      VersionInfo info;
+      try { info = JsonUtility.FromJson<VersionInfo>(req.downloadHandler.text); }
+      catch { Debug.LogWarning("[UpdateChecker] nana-version.json 파싱 실패"); yield break; }
 
-      var snap = task.Result;
-      if (!snap.ContainsField(fieldName)) return;
+      if (info == null) yield break;
 
-      string latest = snap.GetValue<string>(fieldName);
-      if (string.IsNullOrEmpty(latest)) return;
+#if UNITY_ANDROID
+      string latest = info.androidLatestVersion;
+#elif UNITY_IOS
+      string latest = info.iosLatestVersion;
+#else
+      string latest = null;
+#endif
+      if (string.IsNullOrEmpty(latest)) yield break;
 
       if (IsNewer(latest, Application.version))
         ShowPopup(latest);
-#endif
-    });
+    }
+  }
+
+  // JsonUtility 파싱용. 필드명은 JSON 키와 정확히 일치해야 함.
+  [System.Serializable]
+  class VersionInfo
+  {
+    public string androidLatestVersion;
+    public string iosLatestVersion;
   }
 
   // "1.0.2" > "1.0.1" 처럼 비교. 파싱 실패 시 팝업 안 띄움
