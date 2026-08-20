@@ -3,72 +3,74 @@
 ## 프로젝트 개요
 한 줄로 모든 칸을 채우는 퍼즐 게임 (single line block fill).
 고정된 시작 칸에서 출발해 상하좌우 인접 칸을 한 줄로 이어 모든 칸을 채우면 클리어.
-모바일(안드로이드) 출시가 최종 목표.
+모바일(안드로이드) 출시가 최종 목표. 현재 라이브: **Android 1.0.12 / iOS 1.0.5** (다음 릴리즈 1.0.13 / 1.0.6 예정).
 
 ## 개발 환경
 - Unity 6000.0.77f1 LTS, Universal 2D 템플릿
 - Active Input Handling: Both (고전 Input 사용, 터치를 마우스 클릭으로 인식)
 - 타깃: Android + iOS, 세로(Portrait)
+- 배포 순서: Android 먼저 → 검토 → iOS 후속 (사내 iOS 유저 적음)
 - 버전 관리: Git / GitHub
 - 에디터: VS Code + Claude Code
 
 ## 폴더 구조
 - Assets/Scripts/Data  — 데이터 정의 (LevelData)
-- Assets/Scripts/Core  — 게임 로직 (BoardRenderer, GameManager, RewardManager)
-- Assets/Scripts/UI    — UI (LoadingScreen, SettingsPanel, SettingsManager)
-- Assets/Levels        — 레벨 데이터 에셋 (Level_1 등)
-- Assets/Art           — 스프라이트/프리팹 (Cell 프리팹), GameTitle.png (로딩화면 이미지)
-- Assets/UI            — UI Toolkit 에셋 (SettingsPanel.uxml/uss, RewardPanel.uxml/uss, PanelSettings.asset)
-- Assets/Casual Game Sounds U6 — 효과음 에셋 (DM-CGS-01~50.wav)
+- Assets/Scripts/Core  — 게임 로직 (BoardRenderer, GameManager, RewardManager, AdManager, LivesSystem, UpdateChecker, BackButtonHandler, ScreenCaptureProtection, NotificationHelper)
+- Assets/Scripts/UI    — UI (LoadingScreen, SettingsPanel, SettingsManager, CompletionPanel)
+- Assets/Levels        — 레벨 데이터 에셋 (Level_1 ~ Level_100)
+- Assets/Art           — 스프라이트/프리팹 (Cell 프리팹, Rectangle 1.png, popupBoard, Heart 등), GameTitle.png (로딩화면)
+- Assets/UI            — UI Toolkit 에셋 (SettingsPanel/RewardPanel/CompletionPanel .uxml/uss, PanelSettings.asset)
+- Assets/Casual Game Sounds U6 — 효과음 에셋
 - Assets/Firebase      — Firebase SDK (FirebaseApp, Firestore)
 - Assets/ExternalDependencyManager — Firebase EDM4U
-- Assets/GoogleMobileAds — Google Mobile Ads SDK (AdMob)
-- Assets/Editor        — 에디터 도구 (iOSPostBuild, LevelSolverWindow)
+- Assets/GoogleMobileAds — Google Mobile Ads SDK (AdMob) + Mediation/UnityAds
+- Assets/Editor        — 에디터 도구 (iOSPostBuild, LevelSolverWindow, NotificationIconTool)
 - Assets/Plugins/iOS   — iOS 네이티브 플러그인 (ATTBridge.mm, ScreenCaptureBridge.mm)
 
 ## 핵심 파일
-- LevelData.cs: ScriptableObject. 필드 = width, height, startCell, blockedCells.
-- BoardRenderer.cs: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound) 재생. 선·닷 색상은 lineColor 필드 하나로 통합 (#ff8a8a).
-- GameManager.cs: 레벨 목록·진행 상태 관리. 랜덤 셔플 로직(1~10 순차 / 11-30·31-70·**71-110** 그룹 안 미클리어 풀 랜덤 — 마지막 그룹은 40개 풀에서 30번 뽑음). 매 판 선택 시점마다 재선택(옵션 B, 앱 재실행·클리어 모두). PlayerPrefs에 clearedCount(int) + clearedMask 저장. **TotalDisplayLevels=100 상수** 도입해 asset 개수(110)와 유저 진행도(N/100)·보상 트리거를 분리. 구버전 currentLevel은 마이그레이션. 100판 클리어 시 RewardManager.ShowReward() 호출. 판 클리어는 하트 상태에 손대지 않음(값·타이머 그대로 이월). 리셋 이벤트는 livesSystem.Decrement()로 이관. **`public bool IsAllCleared` 프로퍼티(v1.0.8)**: `clearedCount >= TotalDisplayLevels`. 지금은 SettingsPanel이 리워드 버튼 조건에서 이걸 안 쓰지만(로컬 코드 유무로 변경됨) API로 유지. `editorTestLevel` 필드(#if UNITY_EDITOR): 값이 있으면 랜덤 무시하고 그 레벨만 반복 로드. `[TEST] Show Reward Popup` 컨텍스트 메뉴 + **`[TEST] Simulate All Cleared`(v1.0.8)**: cleared 배열 전부 true + clearedCount=100 강제 세팅, 실행 후 설정창 열어 리워드 버튼 노출 검증.
-- RewardManager.cs: 인증코드 발급 + Firestore 저장 + 설정창 재열람 지원. **v1.0.8 완전 재작성(2026-08-03)**: 로컬 저장(PlayerPrefs `rewardCode` + `rewardCodeSynced`)이 진짜 소스, Firestore는 웹 검증용 사본. 4대 원칙: (1)어떤 실패에서도 유저는 코드를 받는다, (2)로컬이 진짜 소스, (3)서버 미동기화면 앱 실행마다 백그라운드 자동 재시도(`StartupBackgroundSync`), (4)팝업 절대 락다운 안 됨(`restartButton` 항상 활성화·모든 대기에 타임아웃). **핵심 흐름**: `ShowReward()`는 로컬 코드 있으면 즉시 표시 → synced면 완료, 미동기화면 `SyncExistingCodeCoroutine`으로 백그라운드 저장 시도. 로컬 없으면 `IssueFlowCoroutine`이 initTask 대기(12초 자체 타임아웃) → 실패 시 `FallbackIssueLocal`로 로컬 코드 생성/표시 + "스크린샷 해두세요" 안내. `IsFirebaseUsable()`이 `IsFaulted`·`Result`·`db`·`editorSimulateInitFail` 모두 명시 체크(예전 `Result` 직접 접근이 AggregateException 삼키던 버그 해결). 저장은 WriteBatch(rewards + code_index 원자적). `FirebaseApp.LogLevel=Debug` 세팅으로 adb logcat 진단 가능. **에디터 시뮬레이션 스위치**: `editorSimulateInitFail`/`editorSimulateSaveFail`(#if UNITY_EDITOR)로 fallback 흐름 검증. `[TEST] Clear Local Reward Code` 컨텍스트 메뉴로 로컬 초기화. **재작성 배경**: 두 유저(Private DNS 사용 이력)가 v1.0.4에서 100판 클리어→저장 실패("네트워크 오류-코드 메모하세요")→로컬 clearedCount=100 남음→v1.0.5(커밋 cb118ac "저장 성공 뒤에만 코드 표시")로 fallback 제거→v1.0.7 업데이트 시 앱 켤 때마다 자동 리워드 팝업+Firebase 초기화 hang으로 완전 락다운. 원인 진단은 조사 결과 Android 16KB page size·Play Services·Private DNS 세 케이스가 유력. v1.0.8 fallback으로 원인 뭐든 유저는 코드 받을 수 있게 됨.
-- AdManager.cs: 전면 광고 + 보상형 광고 로드/표시. **전면 광고**: N레벨마다 표시(기본 3레벨). 카운트 임계치 방식(`count >= N`) — 광고 준비 안 됐으면 카운트 유지한 채 LoadAd()만 호출 → 다음 클리어에서 즉시 표시. 표시 성공 시에만 count=0 리셋. **보상형 광고**: `ShowRewardedAd(Action onReward)` 노출. 완주 콜백에서 onReward 실행(중도 종료 시 미실행). 로드 실패 시 30초 자동 재시도(`CancelInvoke`로 중복 방지). Rewarded unit ID는 Android/iOS 각각 별도. **기존 "4번 리셋 광고" 로직 삭제됨** — 목숨 시스템(LivesSystem)으로 완전 대체. **Pending + 자동 표시**: 유저가 탭했는데 광고 미준비면 `pendingRewardCallback`에 저장 + 15초 타임아웃 Invoke → 로드 완료 순간 자동 표시(재탭 불필요). `OnRewardedStatus` 이벤트로 상태 문자열 브로드캐스트(`RewardedLoadingMessage`/`RewardedFailedMessage` 상수). LivesSystem이 구독해 잠금 오버레이 statusText + `+ 목숨 채우기` 버튼 활성화 상태에 반영. 문구는 하트/과자 세계관 톤 ("하트 불러오는 중..", "하트가 길을 잃었어요..."). "광고" 단어 유저 UI에 노출 금지.
-- SettingsPanel.cs: UI Toolkit 기반 설정 패널 제어. SettingsUI GameObject에 UIDocument와 함께 부착. SettingsManager와 분리되어 있어 UI만 담당. **"인증코드 보기" 버튼(v1.0.8)**: `reward-button`(UXML)을 로컬 코드 존재 시(=코드 발급 이력 있는 유저)에만 노출. 조건은 `rewardManager.GetLocalCode() != ""` — `gameManager.IsAllCleared` 대신 로컬 코드 유무로 판단하는 이유: RewardPanel의 [1레벨로 돌아가기]가 진행도를 리셋해서 IsAllCleared=false가 되면 예전 발급 코드를 다시 못 보게 됨. 인스펙터에 `rewardManager` 필드 필수 연결.
-- Level_1.asset: 3x3, startCell (0,0). 첫 테스트 레벨.
-- Assets/google-services.json: Firebase 프로젝트 설정 파일. 패키지명 com.nanaBox.NANApuzzle.
-- LevelSolverWindow.cs: (Editor 툴, Tools > NANA > Level Solver 메뉴) 각 레벨의 Hamiltonian path 개수를 DFS+백트래킹으로 세서 난이도 등급 매김. 30초 타임아웃, 100+ 조기 종료, 연결성 pruning 적용. Level Generator 섹션: shape 템플릿(Rectangle/Diamond/Cross/Hexagon) + 구조적 clustered 배치 → solver 검증해서 목표 정답 범위에 맞는 후보만 뽑음. 후보 채택 시 대상 LevelData asset 덮어쓰기 가능.
-- ScreenCaptureProtection.cs: 캡처 방지. Android는 UI 스레드에서 FLAG_SECURE 세팅(스크린샷·녹화·미러링 완전 차단). iOS는 UIScreen.isCaptured 폴링해 감지 시 최상단 검은 오버레이(sortingOrder=32767). 씬에 GameObject 하나 만들어 부착. Android는 runOnUiThread가 비동기라 람다 안에서 activity를 재획득해야 함(dispose 이슈).
-- ScreenCaptureBridge.mm: iOS 네이티브 브릿지. `_IsScreenBeingCaptured()` 하나만 노출. UIKit 프레임워크 사용.
-- UpdateChecker.cs: 강제 업데이트 유도. 앱 시작 시 **정적 JSON** (`https://nana-no2.web.app/nana-version.json`) 조회 후 `androidLatestVersion`/`iosLatestVersion`을 Application.version과 System.Version으로 비교. 낮으면 UGUI 팝업(반투명 배경 + 흰 카드). 조회 실패(오프라인/HTTP 에러/5초 타임아웃) 시 30초 후 재시도. **버튼 구성은 플랫폼 분기**: Android=[종료]/[업데이트] 좌우, iOS=[업데이트] 하나만 가운데(폭 50%). Android [종료]=`Application.Quit`으로 팝업 우회 차단(다음 실행 때 Start()가 재실행되며 팝업 재표시). iOS는 Apple HIG상 `Application.Quit` 리젝 리스크로 `#if !UNITY_IOS`로 [종료] 버튼 제외 — 우회 차단은 `OnApplicationPause` 재검사(첫 시도 실패 시 30초 폴링 + 백그라운드 복귀 시 재조회)로 대체. [업데이트]는 스토어 URL(Android `market://`, iOS `apps.apple.com/app/id{IosAppId}`). 에디터에선 `#if UNITY_EDITOR return`으로 스킵. **파일 관리**: `nana-version.json`은 `WaterSortPuzzle/hosting/public/`에 위치 (두 게임이 `nana-no2` Firebase Hosting 프로젝트 공유. 각자 파일명 다름: NANA=`nana-version.json`, WaterSort=`version.json`). 값 수정 후 `cd WaterSortPuzzle/hosting && firebase deploy --only hosting`. CDN cache-control `max-age=300` (5분) 걸려있어 배포 5분 이내 전 유저 반영. **왜 정적 JSON**: 예전엔 Firestore `config/app_version` 문서였는데 Firebase SDK 초기화 대기 + hang 리스크로 팝업이 늦게/안 뜨는 이슈 있어 정적 JSON + UnityWebRequest로 전환. Firestore 는 유저별 데이터(`rewards`, `code_index`)만 남김.
-- LivesSystem.cs: 목숨(하트) 시스템. **규칙**: 기본 3(최대 99), 리셋마다 -1, **판 클리어 시 상태 그대로 이월(값·회복 타이머 앵커 모두 유지)**, 광고 시청 시 +3(판 진행 중엔 99까지 스택). 정책 히스토리: "누적 유지"(초기) → "매판 3 리셋"(2026-08-02) → "누적 유지 복귀"(2026-08-20, 발주자 재지시). **자동 복구**: 3 미만이면 **10분마다 1개씩** 회복(상한 3). `lastLostAt`은 다음 회복 tick의 앵커로 사용되어, tick 발생 시 그만큼 앵커를 앞으로 이동시켜 남은 카운트 유지. 앱을 오래 껐다 켜도 정확히 계산(예: 25분 후 → 2개 회복 + 5분 남은 카운트 유지). **저장**: PlayerPrefs `livesCurrent` + `livesLostAt` 두 키. **UI**: 상단 하트 표시(TMP_Text) + 하트 옆 `recoveryTimerText`(MM:SS, 하트 < 3일 때만 표시) + [+ 목숨 채우기] 버튼(자발적 광고 시청) + 잠금 팝업(**씬에 만들어둔 `LivesLockCanvas` GameObject를 SerializeField로 참조 → SetActive 토글**). 인스펙터 필드: `lockPopup` / `statusText` / `watchButton`. `HandleAdStatus`가 AdManager.OnRewardedStatus 구독해 로드 중일 때 fillButton.interactable=false + statusText에 상태 문구 표시. `TickRecovery` 코루틴이 항상 돌면서 매초 회복 체크·타이머 갱신·잠금 팝업 자동 해제(하트 0→1로 회복 시 자동 잠금 해제). 로딩 스크린 사라진 뒤에만 팝업 표시. AdManager.ShowRewardedAd 완주 콜백으로 리필. **팝업 UI는 씬 배치로 마이그레이션됨** — 예전엔 코드로 Canvas/Card/Text를 동적 생성했지만 시각 iteration 불편해서 씬 편집 방식으로 전환. UI 헬퍼(BuildRoundedSprite/MakeImage/AddText/AddButton 등) 및 관련 필드 전부 삭제(150+줄). **Task #7 논의**: 하트 4+ 상태에서 광고 강제 로직은 광고 시청 인센티브 소멸 위험으로 폐기 결정.
-- BackButtonHandler.cs: 안드로이드 뒤로가기 버튼 처리(KeyCode.Escape 매핑, iOS는 자연스레 no-op). 우선순위: (1)자기 팝업 뜸→닫기 (2)강제 업데이트 팝업(UpdatePromptCanvas)→무시 (3)설정창(SettingsPanel.IsOpen)→닫기 (4)그 외(하트 잠금 포함)→종료 확인 팝업. 팝업: 반투명 배경 + 라운드 흰 카드 + [돌아가기]/[종료하기] 버튼(카드/버튼 모두 procedural rounded sprite). sortingOrder 29500(LivesLock 29000보다 위, UpdatePrompt 30000보다 아래). 씬에 빈 GameObject 만들어 부착, 인스펙터의 Settings Panel 슬롯에 SettingsUI 연결.
-- SettingsPanel.cs: BackButtonHandler에서 열림 상태 확인용 `public bool IsOpen` 프로퍼티 노출(`overlay.resolvedStyle.display == Flex`).
-- NotificationHelper.cs: 하트 회복 완료 로컬 알림. `com.unity.mobile.notifications` 2.4.3 사용. 씬에 GameObject 부착. LivesSystem이 상태 변경 5곳(Start/Decrement/OnLevelCleared/ApplyRewardedAdReward/TickRecovery)에서 `Instance.ScheduleHeartFull` / `Cancel` 호출. Android Small Icon은 **투명 배경 + 흰 픽셀만** 인식(컬러/미등록 시 알림 안 뜸). `Assets/Editor/NotificationIconTool.cs`가 흰 하트 실루엣 자동 생성 메뉴 제공. 앱 실행 중 하트 3 도달 시 Cancel은 의도된 스팸 방지 동작(유저가 앱에서 직접 확인 가능하므로).
-- AdMob Mediation: Android 미디에이션 그룹(NANA-Android-Interstitial/Rewarded)에 Unity Ads 소스 붙임. UnityAds Unity Mediation Plugin v3.19.0을 Source zip → 수동 복사 방식으로 임포트(`Assets/GoogleMobileAds/Mediation/UnityAds/`) — GoogleMobileAds 11.2.0이 Assets 방식이라 v3.19.0의 UPM 배포와 의존성 불일치로 UPM 실패. Unity Ads Dashboard 나나박스 Android(Game ID 800107828, Interstitial_Android/Rewarded_Android placement) 세팅. AdMob 콘솔 + Unity Ads Dashboard 양쪽 다 SJ Phone(광고 ID) 테스트 기기 등록. Ad Inspector Single Ad Source Test로 Unity Ads 응답 검증 완료(재고 있음). iOS 미디에이션은 다음 세션.
+- **LevelData.cs**: ScriptableObject. 필드 = width, height, startCell, blockedCells.
+- **BoardRenderer.cs**: Board 오브젝트에 부착. 레벨을 격자로 그리고, 마우스/터치 입력으로 칸을 채움. 효과음(fillSound, winSound, stuckSound) 재생. 색상은 인스펙터 필드로 튜닝(emptyColor 시안블루 #00C8FF, lineColor 갈색 #5C2E00, filledColor 연핑크, winColor 라벤더, stuckColor 빨강). `filledSprite` 필드가 세팅되면 채운 칸에 스프라이트 이미지 사용(Awake에서 PPU 자동 조정해 cellSprite와 같은 월드 크기, OnDestroy에서 정리). `OnValidate`로 플레이 중 인스펙터 값 변경 즉시 반영(편집 모드에서는 cells 비어있을 수 있어 가드). 막힘 감지 시 잠깐 stuckColor 표시 후 리셋 — filledSprite tint 왜곡 방지 위해 임시 cellSprite로 되돌림.
+- **GameManager.cs**: 레벨 목록·진행 상태 관리. 랜덤 셔플: 1~10 순차 / 11-70·71-90·91-100 각 그룹 안 미클리어 풀에서 랜덤 뽑기 (`GroupBoundaries = {0,10,70,90,100}`). 매판 재선택(옵션 B): 앱 재실행·클리어 시점마다 다시 뽑음. 리롤 편법(앱 껐다 켜기) 감수. PlayerPrefs에 `clearedCount`(int) + `clearedMask`(100자 문자열) 저장. `TotalDisplayLevels=100` 상수 = 진행도 표시·보상 트리거 기준. HUD 표시는 "LEVEL {clearedCount+1}" 형식(100에서 캡). 100판 클리어 시 `RewardManager.ShowReward()` 호출. 판 클리어는 하트 상태에 손대지 않음(값·타이머 앵커 그대로 이월). 리셋 이벤트는 `livesSystem.Decrement()`로 이관. `public bool IsAllCleared` = `clearedCount >= TotalDisplayLevels`. 구버전 유저 마이그레이션: legacy `currentLevel` → 앞 N개(index 0~N-1) 클리어로 간주. `editorTestLevel` 필드(#if UNITY_EDITOR): 세팅되면 랜덤 무시하고 그 레벨만 반복. `[TEST] Show Reward Popup` / `[TEST] Simulate All Cleared` 컨텍스트 메뉴.
+- **RewardManager.cs**: 인증코드 발급 + Firestore 저장 + 설정창 재열람. 로컬 저장(PlayerPrefs `rewardCode` + `rewardCodeSynced`)이 진짜 소스, Firestore는 웹 검증용 사본. **4대 원칙**: (1)어떤 실패에서도 유저는 코드를 받는다, (2)로컬이 진짜 소스, (3)서버 미동기화면 앱 실행마다 백그라운드 자동 재시도(`StartupBackgroundSync`), (4)팝업 절대 락다운 안 됨(`restartButton` 항상 활성화·모든 대기에 타임아웃). **핵심 흐름**: `ShowReward()`는 로컬 코드 있으면 즉시 표시 → synced면 완료, 미동기화면 `SyncExistingCodeCoroutine`으로 백그라운드 저장. 로컬 없으면 `IssueFlowCoroutine`이 initTask 대기(12초 자체 타임아웃) → 실패 시 `FallbackIssueLocal`로 로컬 코드 생성/표시 + "스크린샷 해두세요" 안내. `IsFirebaseUsable()`이 `IsFaulted`·`Result`·`db`·`editorSimulateInitFail` 모두 명시 체크(Firebase Task는 `Result` 직접 접근이 AggregateException 삼키므로 반드시 `IsFaulted` 먼저 참고: [[feedback-firebase-task-isfaulted]]). 저장은 WriteBatch(rewards + code_index 원자적). `FirebaseApp.LogLevel=Debug`로 adb logcat 진단. **에디터 시뮬레이션**: `editorSimulateInitFail`/`editorSimulateSaveFail`(#if UNITY_EDITOR)로 fallback 흐름 검증. `[TEST] Clear Local Reward Code` 컨텍스트 메뉴.
+- **AdManager.cs**: 전면 광고 + 보상형 광고 로드/표시. **전면**: N레벨마다 표시(기본 3). 카운트 임계치 방식(`count >= N`) — 광고 준비 안 됐으면 카운트 유지한 채 `LoadAd()`만 호출 → 다음 클리어에서 즉시 표시. 표시 성공 시에만 count=0 리셋. **보상형**: `ShowRewardedAd(Action onReward)` 노출. 완주 콜백에서 onReward 실행(중도 종료 시 미실행). 로드 실패 시 30초 자동 재시도(`CancelInvoke`로 중복 방지). Rewarded unit ID는 Android/iOS 각각 별도. **Pending + 자동 표시**: 유저 탭 시 광고 미준비면 `pendingRewardCallback` 저장 + 15초 타임아웃 → 로드 완료 순간 자동 표시(재탭 불필요). `OnRewardedStatus` 이벤트로 상태 문자열 브로드캐스트(`RewardedLoadingMessage`/`RewardedFailedMessage` 상수). LivesSystem이 구독해 잠금 오버레이 statusText + `+ 목숨 채우기` 버튼 활성화 상태에 반영. 문구는 하트/과자 세계관 톤. "광고" 단어 유저 UI에 노출 금지.
+- **SettingsPanel.cs**: UI Toolkit 기반 설정 패널 제어. SettingsUI GameObject에 UIDocument와 함께 부착. SettingsManager와 분리되어 있어 UI만 담당. **"인증코드 보기" 버튼**: `reward-button`(UXML)을 로컬 코드 존재(`rewardManager.GetLocalCode() != ""`) 시에만 노출. RewardPanel의 [1레벨로 돌아가기]가 진행도 리셋해도 로컬 코드는 남으므로 언제든 재열람 가능. 인스펙터에 `rewardManager` 필드 필수 연결. `public bool IsOpen` 프로퍼티 노출(BackButtonHandler에서 참조).
+- **CompletionPanel.cs**: 100판 완주자 전용 확정 화면. CompletionUI GameObject에 UIDocument와 함께 부착. 표시 조건: `clearedCount >= 100 && 로컬 코드 있음`. 표시 시점: (1) 리워드 팝업 [닫기] 시 완주 상태면 이어서, (2) 앱 시작 시 완주 상태면 즉시. [1레벨로 돌아가기]가 진행도 리셋 후 화면 숨김. `pickingMode`를 Position/Ignore로 토글해 오버레이 뒤 UI 차단 제어.
+- **Level_1.asset**: 3x3, startCell (0,0). 첫 테스트 레벨.
+- **Assets/google-services.json**: Firebase 프로젝트 설정. 패키지명 com.nanaBox.NANApuzzle.
+- **LevelSolverWindow.cs**: (Editor 툴, Tools > NANA > Level Solver) 각 레벨의 Hamiltonian path 개수를 DFS+백트래킹으로 세서 난이도 등급. 30초 타임아웃, 100+ 조기 종료, 연결성 pruning. Level Generator: shape 템플릿(Rectangle/Diamond/Cross/Hexagon) + 구조적 clustered 배치 → solver 검증해서 목표 정답 범위 후보만. 후보 채택 시 대상 LevelData asset 덮어쓰기 가능.
+- **ScreenCaptureProtection.cs**: 캡처 방지. Android는 UI 스레드에서 `FLAG_SECURE` 세팅(스크린샷·녹화·미러링 완전 차단). iOS는 `UIScreen.isCaptured` 폴링해 감지 시 최상단 검은 오버레이(sortingOrder=32767). 씬에 GameObject 하나 부착. Android는 `runOnUiThread`가 비동기라 람다 안에서 activity 재획득 필요(dispose 이슈).
+- **ScreenCaptureBridge.mm**: iOS 네이티브 브릿지. `_IsScreenBeingCaptured()` 하나만 노출. UIKit 프레임워크 사용.
+- **UpdateChecker.cs**: 강제 업데이트 유도. 앱 시작 시 정적 JSON (`https://nana-no2.web.app/nana-version.json`) 조회 후 `androidLatestVersion`/`iosLatestVersion`을 `Application.version`과 `System.Version`으로 비교. 낮으면 UGUI 팝업. 조회 실패(오프라인/HTTP 에러/5초 타임아웃) 시 30초 후 재시도. **버튼 구성 플랫폼 분기**: Android=[종료]/[업데이트] 좌우, iOS=[업데이트] 하나만 가운데(폭 50%). Android [종료]=`Application.Quit` (다음 실행 때 팝업 재표시). iOS는 Apple HIG상 `Application.Quit` 리젝 리스크로 `#if !UNITY_IOS`로 [종료] 제외 — 우회 차단은 `OnApplicationPause` 재검사(첫 시도 실패 시 30초 폴링 + 백그라운드 복귀 시 재조회). [업데이트]는 스토어 URL(Android `market://`, iOS `apps.apple.com/app/id{IosAppId}`). 에디터에선 `#if UNITY_EDITOR return`으로 스킵. **JSON 파일 관리**: `WaterSortPuzzle/hosting/public/nana-version.json` (두 게임이 `nana-no2` Firebase Hosting 프로젝트 공유. 파일명 분리: NANA=`nana-version.json`, WaterSort=`version.json`). 값 수정 후 `cd WaterSortPuzzle/hosting && firebase deploy --only hosting`. CDN cache-control `max-age=300`(5분).
+- **LivesSystem.cs**: 목숨(하트) 시스템. **규칙**: 기본 3(상한 99), 리셋 -1, 판 클리어 시 상태 그대로 이월(값·타이머 앵커 유지), 광고 시청 시 +3(판 진행 중 99까지 스택). **자동 복구**: 3 미만이면 10분마다 1개씩 회복(상한 3). `lastLostAt`은 다음 회복 tick 앵커로, tick 발생 시 앵커를 앞으로 이동시켜 남은 카운트 유지. 앱 오래 껐다 켜도 정확 계산(예: 25분 후 → 2개 회복 + 5분 남은 카운트 유지). **저장**: PlayerPrefs `livesCurrent` + `livesLostAt`. **UI**: 상단 하트 아이콘 + `livesNumber` TMP_Text(숫자) + 하트 옆 `recoveryTimerText`(MM:SS, 하트 <3일 때만) + `+ 목숨 채우기` 버튼(자발적 광고 시청) + 잠금 팝업(씬에 만들어둔 `LivesLockCanvas` GameObject를 SerializeField로 참조 → SetActive 토글). 인스펙터 필드: `lockPopup` / `statusText` / `watchButton`. `HandleAdStatus`가 `AdManager.OnRewardedStatus` 구독해 로드 중일 때 `fillButton.interactable=false` + statusText 상태 문구 표시. `TickRecovery` 코루틴이 항상 돌며 매초 회복 체크·타이머 갱신·잠금 팝업 자동 해제(하트 0→1 회복 시). 로딩 스크린 사라진 뒤에만 팝업 표시.
+- **BackButtonHandler.cs**: 안드로이드 뒤로가기 버튼 처리(`KeyCode.Escape` 매핑, iOS는 자연스레 no-op). 우선순위: (1)자기 팝업 뜸→닫기 (2)강제 업데이트 팝업(UpdatePromptCanvas)→무시 (3)설정창(`SettingsPanel.IsOpen`)→닫기 (4)그 외(하트 잠금 포함)→종료 확인 팝업. 팝업: 반투명 배경 + 라운드 흰 카드 + [돌아가기]/[종료하기] 버튼(procedural rounded sprite). sortingOrder 29500(LivesLock 29000보다 위, UpdatePrompt 30000보다 아래). 씬에 빈 GameObject 부착, 인스펙터의 Settings Panel 슬롯에 SettingsUI 연결.
+- **NotificationHelper.cs**: 하트 회복 완료 로컬 알림. `com.unity.mobile.notifications` 2.4.3 사용. 씬에 GameObject 부착. LivesSystem이 상태 변경 지점(Start/Decrement/ApplyRewardedAdReward/TickRecovery)에서 `Instance.ScheduleHeartFull` / `Cancel` 호출. Android Small Icon은 **투명 배경 + 흰 픽셀만** 인식(컬러/미등록 시 알림 안 뜸). `Assets/Editor/NotificationIconTool.cs`가 흰 하트 실루엣 자동 생성 메뉴 제공. 앱 실행 중 하트 3 도달 시 Cancel은 의도된 스팸 방지 동작.
+- **AdMob Mediation**: Android + iOS 미디에이션 그룹에 Unity Ads 소스 매핑. `Assets/GoogleMobileAds/Mediation/UnityAds/`에 v3.19.0 수동 임포트(UPM은 GoogleMobileAds 11.2.0의 Assets 방식과 의존성 불일치). Unity Ads Dashboard: NANA Android(Game ID 800107828), iOS(Game ID 800111550), 각 Interstitial/Rewarded placement. AdMob 콘솔 그룹: NANA-Android-Interstitial/Rewarded, NANA-iOS-Interstitial/Rewarded. `iOSPostBuild.cs`가 Unity Ads 요구 SKAdNetwork ID를 Info.plist에 병합(`[PostProcessBuild(999)]`, HashSet 중복 스킵으로 idempotent). Unity Ads 목록 갱신 필요 시 배열 교체.
 
 ## UI Toolkit 구조
-- SettingsUI (GameObject): UIDocument + SettingsPanel.cs. Assets/UI/SettingsPanel.uxml/uss 사용.
-- RewardUI (GameObject): UIDocument + RewardManager.cs. Assets/UI/RewardPanel.uxml/uss 사용.
+- SettingsUI (GameObject): UIDocument + SettingsPanel.cs. Assets/UI/SettingsPanel.uxml/uss
+- RewardUI (GameObject): UIDocument + RewardManager.cs. Assets/UI/RewardPanel.uxml/uss
+- CompletionUI (GameObject): UIDocument + CompletionPanel.cs. Assets/UI/CompletionPanel.uxml/uss
 - PanelSettings: Assets/UI/PanelSettings.asset. Scale With Screen Size, 1080×1920, Match Height.
-- USS에서 폰트: `-unity-font: url("../TextMesh Pro/Fonts/NanumSquareRoundEB.ttf")` 로 연결.
+- USS 폰트: `-unity-font: url("../TextMesh Pro/Fonts/NanumSquareRoundEB.ttf")` 로 연결.
 - UIDocument 오브젝트는 눈 아이콘(씬 뷰 숨김)으로 숨기면 런타임에 영향을 주므로 사용 금지. 대신 UXML에서 `style="display: none;"` 으로 초기 숨김 처리.
 
 ## UGUI Canvas (HUD) 반응형 세팅
 - **주의**: UGUI Canvas와 UI Toolkit PanelSettings는 별개 시스템. PanelSettings 반응형이라도 UGUI Canvas는 별도 세팅 필요.
 - **CanvasScaler**: Scale With Screen Size / Reference Resolution 1080×2340 (갤럭시 실기 기준) / Match Width(0). 폭 기준이라 UI 원본 크기 유지, 세로가 긴 폰(폴더블/아이폰)에선 여백만 늘어남.
 - **HUD 요소 앵커** (Canvas 자식):
-  - 상단 중앙: LevelText, CountText — Top Center (0.5, 1)
+  - 상단 중앙: LevelText — Top Center (0.5, 1)
   - 좌상단: SettingsButton — Top Left (0, 1)
   - 우상단: Heart, LiveCountText, Timer — Top Right (1, 1)
   - 하단 중앙: PlusHeartButton — Bottom Center (0.5, 0)
   - 전체 stretch: LoadingPanel — Stretch (0,0)/(1,1) + AspectRatioFitter Envelope Parent
-- **LoadingPanel AspectRatioFitter**: aspectMode Envelope Parent + aspectRatio 0.4615 (=1080/2340, GameTitle.png 실제 비율). aspectRatio 잘못 잡으면 오버플로우(폭 튀어나옴) — 이미지 비율 바꿀 때 이 값도 같이 바꿔야 함.
-- **함정**: CanvasScaler 기본값이 Constant Pixel Size + 800×600(옛 유니티 기본)이라 초기엔 반응형 아님. 잊고 그대로 두면 실기에서 UI가 어긋남 (2026-07-29 발견·수정).
+- **LoadingPanel AspectRatioFitter**: aspectMode Envelope Parent + aspectRatio 0.4615 (=1080/2340, GameTitle.png 실제 비율). 이미지 비율 바꾸면 이 값도 같이 바꿀 것.
+- **함정**: CanvasScaler 기본값이 Constant Pixel Size + 800×600이라 초기엔 반응형 아님. 잊고 그대로 두면 실기에서 UI 어긋남.
 
 ## LivesLockCanvas (하트 잠금 팝업 씬 배치)
 - 씬에 별도 UGUI Canvas로 존재 (sortingOrder 29000, ScreenSpaceOverlay, Scale With Screen Size 1080×2340 Match Width). LivesSystem이 SetActive로 열고 닫음. 초기 SetActive false.
 - **계층**: `LivesLockCanvas → Background(어둠) / CardBorder(분홍 프레임) / Card(크림핑크) → Title / Divider / Message / StatusText / WatchButton→Text`
-- **9-slice 스프라이트**: `Assets/Art/Rectangle 1.png` — Figma에서 100×100 라운드 사각형(코너 10, 흰색) → 2x export → Sprite Editor에서 Border 20 세팅. CardBorder/Card/WatchButton 3개 Image가 이 하나를 공유하고 색은 각자 tint. **함정**: Sprite Editor에서 Multiple 모드로 자동 전환되면 spriteBorder가 최상위에서 0으로 리셋됨 — .meta 파일에서 `spriteMode: 1` + `spriteBorder` 값 확인 필요.
-- **문구 톤**: "광고" 단어 유저 UI에 노출 금지. "달콤한 과자가 기다리고 있어요" 같은 카피는 실물 과자 상품 티저 (100판 클리어 보상). 상태 메시지는 `AdManager.RewardedLoadingMessage`/`RewardedFailedMessage` 상수에서 관리.
+- **9-slice 스프라이트**: `Assets/Art/Rectangle 1.png` — 100×100 라운드 사각형(코너 10) → 2x export → Sprite Editor에서 Border 20. CardBorder/Card/WatchButton 3개 Image가 이 하나를 공유하고 색은 각자 tint. **함정**: Sprite Editor에서 Multiple 모드로 자동 전환되면 spriteBorder가 최상위에서 0으로 리셋됨 — `.meta`에서 `spriteMode: 1` + `spriteBorder` 값 확인.
+- **문구 톤**: "광고" 단어 유저 UI에 노출 금지. "달콤한 과자가 기다리고 있어요" 같은 카피는 실물 과자 상품 티저(100판 클리어 보상). 상태 메시지는 `AdManager.RewardedLoadingMessage`/`RewardedFailedMessage` 상수.
 - **버튼 라벨 스왑 금지**: `+3` 같은 작은 버튼 라벨에 긴 상태 메시지 넣으면 오버플로우로 UI 깨짐. 대신 `Button.interactable` 토글로 로딩 중 회색 처리.
 
 ## 게임 규칙 / 데이터 모델
@@ -78,19 +80,18 @@
 
 ## 레벨 진행 로직 (랜덤 셔플)
 - **1~10**: 순차 진행 (진입장벽 유지)
-- **11-30 / 31-70**: 각 그룹 안에서 미클리어 판 풀에서 랜덤 뽑기
-- **71-100 슬롯 (30번 뽑기) = asset index 70~109 풀 (40개)**: 매 세션마다 유저가 못 본 판 10개가 달라져 재플레이 유도
-- **매판 재선택 (옵션 B)**: 앱 재실행할 때마다 미클리어 풀에서 다시 랜덤. 리롤 편법(앱 껐다 켜기) 감수함.
-- 화면 표시는 실제 레벨 번호가 아니라 진행도 "N/100" (`TotalDisplayLevels` 상수). asset 개수(110)와 별개.
-- **100판 클리어 = 보상 트리거**. 이후에도 그룹 D 미클리어 10개 자유 플레이 가능하지만 RewardManager가 중복 발급 차단.
+- **11-70 / 71-90 / 91-100**: 각 그룹 안 미클리어 판 풀에서 랜덤 뽑기 (`GroupBoundaries = {0,10,70,90,100}`)
+- **매판 재선택 (옵션 B)**: 앱 재실행할 때마다 미클리어 풀에서 다시 랜덤. 리롤 편법(앱 껐다 켜기) 감수.
+- 화면 표시는 "LEVEL {현재 도전 판 번호 = clearedCount+1}" 형식, 100에서 캡.
+- **100판 클리어 = 보상 트리거**. RewardManager가 기기ID 중복 발급 차단.
 - 구버전 유저 마이그레이션: legacy `currentLevel` → 앞 N개(index 0~N-1) 클리어로 간주.
 
 ## 목숨(하트) 시스템
-- **표시**: 상단 `x N` 형태 (하트 아이콘 + TMP_Text) + 옆에 회복 카운트 MM:SS (하트 < 3일 때만 노출)
+- **표시**: 상단 하트 아이콘 + `livesNumber` 숫자 + 옆에 회복 카운트 MM:SS (하트 <3일 때만 노출)
 - **규칙**: 기본 3(상한 99), 리셋 -1, 광고 시청 +3(판 안에선 99까지 스택), **판 클리어 시 상태 그대로 이월**(값·타이머 앵커 유지)
 - **잠금**: 목숨 0 → 오버레이(반투명+흰 카드+[하트 채우러 가기]). LoadingScreen 사라진 뒤에만 표시. 하트 0→1 회복 순간 자동 해제
-- **자동 복구**: 3 미만 → **10분마다 1개씩** 회복(상한 3). 0에서 3까지 총 30분 소요
-- **광고 로드 실패(Private DNS 등)**: 유저는 10분 대기하면 1개는 회복됨 (강경 정책 완화됨)
+- **자동 복구**: 3 미만 → 10분마다 1개씩 회복(상한 3). 0에서 3까지 총 30분
+- **광고 로드 실패(Private DNS 등)**: 유저는 10분 대기하면 1개는 회복됨
 - **자발적 시청**: `+ 목숨 채우기` 버튼으로 언제든 +3 스택 가능
 - **뒤로가기 처리**: [[BackButtonHandler.cs]]가 잠금 상태에서도 뒤로가기 → 종료 팝업 띄워줌(탈출 수단 제공)
 
@@ -184,12 +185,15 @@
 - [x] iOS Unity Ads Mediation 통합 (2026-08-04) — Unity Ads Dashboard에 iOS 앱 등록(Game ID `800111550`) + placement 2개 생성(`Interstitial_iOS`, `Rewarded_iOS`). AdMob 콘솔에 iOS 미디에이션 그룹 2개 생성(`NANA-iOS-Interstitial`, `NANA-iOS-Rewarded`) + Unity Ads(입찰) 소스 매핑. `Assets/Editor/iOSPostBuild.cs`에 Unity Ads 요구 SKAdNetwork ID 76개 병합 로직 추가(`[PostProcessBuild(999)]`로 GoogleMobileAds `PListProcessor` 뒤에 실행 + HashSet 중복 스킵으로 idempotent). Unity Ads 목록 갱신 필요 시 배열만 교체하면 됨(출처: Unity Ads Dashboard > iOS 앱 상세 > "Unity Ads SDK 3.5.1 이상용 SKAdNetwork ID" 전체 목록 버튼). Xcode 빌드 후 Info.plist에 76개 실제 반영 실측만 남음
 - [x] iOS v1.0.3 빌드 & App Store 심사 제출 (2026-08-04) — bundleVersion 1.0.3, iPhone buildNumber 5. Android v1.0.10과 기능 동등: 랜덤 셔플, 캡처 방지, 강제 업데이트(iOS는 [업데이트]만), 보상형 광고 + Pending 흐름, 목숨 시스템, 셔플 그룹 확장, RewardManager v1.0.8 재작성, 설정창 인증코드 보기, Firebase CheckAndFix 방어(v1.0.9), 완료 화면(v1.0.10), Unity Ads iOS mediation. Xcode Info.plist `SKAdNetworkItems=89` 실측 확인(목표 76+ 통과). iOS 버전은 Android와 독립 트랙(직전 1.0.1 → 1.0.3, 1.0.2 스킵. App Store Connect가 제안한 번호). 앱 암호화 exemption은 대화창에서 "4번(해당 없음)" 선택으로 통과
 - [x] UpdateChecker Firestore → 정적 JSON 전환 — 예전 `config/app_version` Firestore 조회 방식은 Firebase SDK 초기화 대기 + hang 리스크로 팝업이 늦게/안 뜨는 이슈. `UnityWebRequest`로 `https://nana-no2.web.app/nana-version.json` 직접 조회하는 방식으로 전환. 5초 타임아웃 + 실패 시 30초 재시도 + `OnApplicationPause` 재조회
-- [x] iOS v1.0.4 & Android v1.0.11 배포 완료 — 현재 라이브 최신 버전
-- [x] `nana-version.json` 최초 생성 & 배포 (2026-08-17) — 정적 JSON 전환 후 파일 자체가 없어(404) UpdateChecker가 dormant 상태였음. `WaterSortPuzzle/hosting/public/nana-version.json` 생성(`{"androidLatestVersion":"1.0.11","iosLatestVersion":"1.0.4"}`) + `hosting/firebase.json`에 `/nana-version.json` 캐시 헤더(`max-age=300`) 추가. WaterSort와 hosting 공유(nana-no2), 파일명만 분리(WaterSort=`version.json`, NANA=`nana-version.json`) — 배포 명령이 `public/` 전체를 밀어넣는 방식이라 두 파일 모두 같은 폴더에서 관리 필요
+- [x] iOS v1.0.4 & Android v1.0.11 배포 완료
+- [x] `nana-version.json` 최초 생성 & 배포 (2026-08-17) — 정적 JSON 전환 후 파일 자체가 없어(404) UpdateChecker가 dormant 상태였음. `WaterSortPuzzle/hosting/public/nana-version.json` 생성 + `hosting/firebase.json`에 `/nana-version.json` 캐시 헤더(`max-age=300`) 추가. WaterSort와 hosting 공유(nana-no2), 파일명만 분리(WaterSort=`version.json`, NANA=`nana-version.json`) — 배포 명령이 `public/` 전체를 밀어넣는 방식이라 두 파일 모두 같은 폴더에서 관리 필요
+- [x] iOS v1.0.5 & Android v1.0.12 배포 완료 — 현재 라이브 최신 버전
+- [x] 시각 테마 리뉴얼 (2026-08-20) — 하트 정책 "누적 유지 복귀"로 재정비, BoardRenderer 색상·filledSprite 지원·OnValidate·stuck 왜곡 방지, HUD "LEVEL N" 포맷, 인증코드 로컬-퍼스트 원칙 유지, Cafe24Ssurround/Tenada 폰트 + popupBoard/round 스프라이트 + Layer Lab/Buttons UI 팩 도입
 
 ## 다음 할 일 (TODO)
 - [ ] AdMob 콘솔 Rewarded 광고 unit 실기 노출 검증 — `useTestAd=false` + 자기 기기 테스트 등록. Android/iOS 모두 라이브 배포 완료 상태라 이슈 미보고 시 자동 완료 처리 가능
 - [ ] 다음 릴리즈 배포 시 `nana-version.json` 값 갱신 워크플로 — **스토어 심사 통과 후에만** `WaterSortPuzzle/hosting/public/nana-version.json` 값 올리고 `firebase deploy --only hosting`. 심사 통과 전 갱신 금지(리뷰어 기기 팝업 → 리젝 리스크)
+- [ ] **다음 Android 빌드 전 `bundleVersion` 갱신 필수** — ProjectSettings.asset의 `bundleVersion`은 iOS/Android 공유 필드. 마지막 iOS 빌드 잔재로 남아있을 수 있으니 Android 빌드 직전 반드시 1.0.13 이상으로 갱신
 - [ ] **디바이스별 UI 대응 (부분 완료)** — CanvasScaler·HUD 앵커·LoadingPanel aspectRatio는 처리됨(2026-07-29). 남은 것: (a) 실기 검증(갤럭시 S22+/S25/폴더블/아이폰), (b) SettingsButton localScale 2.1757 이상값 정상화(sizeDelta로 조절), (c) Safe Area(펀치홀·노치) 대응 여부 결정, (d) BoardRenderer.FitCamera 극단 비율(폴더블) 대응 검토. 참조: [[project-device-ui-adapt]]
 
 ## 협업 방식 메모
@@ -198,4 +202,3 @@
 - 단순 편집은 사용자, 여러 파일에 걸친 코드 작업은 Claude Code가 담당.
 - 커밋은 의미 있는 체크포인트마다.
 - 코드마다 필요하다고 생각되는 부분에 이해하기 쉽게 추가적인 주석 달아줄 것.
-
