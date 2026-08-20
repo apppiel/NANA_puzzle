@@ -16,15 +16,24 @@ public class BoardRenderer : MonoBehaviour
 
   // ── 칸 색상 ─────────────────────────────────────────────────────
   // public으로 선언해 인스펙터에서 직접 색을 바꿀 수 있음. 코드 수정 없이 테마 변경 가능
-  public Color emptyColor = Color.white;                              // 빈 칸 → 흰색
+  public Color emptyColor = new Color(0f, 0.784f, 1f);                          // 빈 칸 → #00C8FF (시안블루)
   public Color startColor = new Color(1f, 0.8f, 0.2f);              // 시작 칸 → 노란색
   public Color filledColor = new Color(0.996f, 0.871f, 0.871f);     // 경로 칸 → 연한 핑크
   public Color winColor = new Color(0.72f, 0.52f, 0.95f);           // 클리어 시 → 라벤더
+  public Color stuckColor = new Color(1f, 0.4f, 0.4f);              // 막힘(실패) 시 잠깐 표시할 색 → 빨강
   public Color outlineColor = new Color(0.75f, 0.75f, 0.75f, 0.8f);  // 외곽선 → 연한 회색
+
+  // 채워진 칸에 사용할 이미지. 세팅되어 있으면 filledColor 대신 이 스프라이트를 사용(색상은 흰색으로 원본 유지)
+  // 인스펙터에서 Sprite 에셋을 드래그해서 연결
+  public Sprite filledSprite;
+
+  // filledSprite를 cellSprite와 같은 월드 크기로 표시하기 위해 PPU를 재조정한 사본. Awake에서 한 번만 생성
+  Sprite scaledFilledSprite;
   // ── 런타임 데이터 ───────────────────────────────────────────────
   // 격자 좌표(Vector2Int) → 해당 칸의 SpriteRenderer
   // Dictionary를 쓰는 이유: "이 좌표에 칸이 있는지" 확인하고 색을 바꿀 때 O(1)로 빠르게 접근 가능
   Dictionary<Vector2Int, SpriteRenderer> cells = new Dictionary<Vector2Int, SpriteRenderer>();
+  Dictionary<Vector2Int, SpriteRenderer> outlines = new Dictionary<Vector2Int, SpriteRenderer>(); // 칸 뒤 외곽선(그림자 효과)
   Dictionary<Vector2Int, SpriteRenderer> glows = new Dictionary<Vector2Int, SpriteRenderer>(); // 칸 바깥 글로우 스프라이트
 
   // 플레이어가 지나온 칸을 순서대로 저장한 목록
@@ -39,7 +48,7 @@ public class BoardRenderer : MonoBehaviour
   Sprite cellSprite;      // 모든 칸이 공유하는 둥근 사각형 그림. Awake에서 한 번만 생성
   Material lineMaterial;  // 경로 선용 머티리얼. new Material()은 자동 해제가 안 되므로 Awake에서 한 번만 생성
   float offsetX, offsetY;  // 격자를 화면 중앙에 맞추기 위한 이동값 (ShowLevel에서 계산)
-  readonly Color lineColor = new Color(1f, 0.549f, 0.549f);  // 선·닷 공통 색상 (#ff8c8c)
+  readonly Color lineColor = new Color(0.361f, 0.180f, 0f);  // 선·닷 공통 색상 (#5C2E00)
   readonly WaitForSeconds waitStuck = new WaitForSeconds(0.6f);  // 캐싱: 매번 new 하면 GC 부담
   static readonly Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
   SpriteRenderer startDot;    // 시작점 중앙 흰 원 표시
@@ -82,11 +91,43 @@ public class BoardRenderer : MonoBehaviour
     lineMaterial = new Material(Shader.Find("Sprites/Default"));  // 레벨이 바뀌어도 재사용
     audioSource = gameObject.AddComponent<AudioSource>();
     audioSource.playOnAwake = false;
+
+    // filledSprite가 있으면 cellSprite와 동일한 월드 크기로 보이도록 PPU만 재조정한 사본을 만든다
+    // (원본 에셋의 import 설정은 건드리지 않음)
+    if (filledSprite != null)
+    {
+      float targetPPU = filledSprite.pixelsPerUnit * (filledSprite.bounds.size.x / cellSprite.bounds.size.x);
+      scaledFilledSprite = Sprite.Create(
+        filledSprite.texture,
+        filledSprite.rect,
+        new Vector2(0.5f, 0.5f),
+        targetPPU
+      );
+    }
   }
 
   void OnDestroy()
   {
     if (lineMaterial != null) Destroy(lineMaterial);
+    if (scaledFilledSprite != null) Destroy(scaledFilledSprite);
+  }
+
+  // 인스펙터에서 색상·필드를 변경하면 즉시 화면에 반영 (플레이 중에만 동작)
+  // 편집 모드에서는 cells·line이 초기화되지 않아 예외가 나므로 스킵
+  void OnValidate()
+  {
+    if (!Application.isPlaying) return;
+    if (cells == null || cells.Count == 0 || line == null) return;
+
+    // 선 색상은 Redraw()가 다시 칠하지 않으므로 여기서 직접 반영
+    line.startColor = line.endColor = lineColor;
+    if (headArrow != null) headArrow.color = lineColor;
+
+    // 외곽선(그림자)도 Redraw() 대상이 아니라 별도로 순회 갱신
+    foreach (var sr in outlines.Values)
+      if (sr != null) sr.color = outlineColor;
+
+    Redraw();
   }
 
   // GameManager가 "이 레벨 그려줘" 하고 호출하는 함수 (외부에서 부를 수 있도록 public)
@@ -137,6 +178,7 @@ public class BoardRenderer : MonoBehaviour
       Destroy(child.gameObject);
 
     cells.Clear();
+    outlines.Clear();
     glows.Clear();
     path.Clear();
     pathSet.Clear();
@@ -174,6 +216,7 @@ public class BoardRenderer : MonoBehaviour
         outlineSr.sprite = cellSprite;
         outlineSr.color = outlineColor;
         outlineSr.sortingOrder = -1;  // 칸(order 0) 뒤에 그려짐
+        outlines[coord] = outlineSr;  // OnValidate에서 실시간 색 갱신용
 
         // 칸 뒤에 글로우 스프라이트 추가 (처음엔 투명, 채워질 때 맥동)
         GameObject glowObj = new GameObject("Glow");
@@ -222,7 +265,7 @@ public class BoardRenderer : MonoBehaviour
 
     startDot = dotObj.AddComponent<SpriteRenderer>();
     startDot.sprite = circleSprite;
-    startDot.color = Color.white;
+    startDot.color = lineColor;
     startDot.sortingOrder = 2;  // 선(1)보다 위에 그려짐
   }
 
@@ -231,7 +274,7 @@ public class BoardRenderer : MonoBehaviour
     if (startDot == null) return;
     startDot.gameObject.SetActive(true);
     startDot.transform.localScale = Vector3.one * 0.35f;
-    startDot.color = Color.white;
+    startDot.color = lineColor;
   }
 
   void CreateHeadArrow()
@@ -264,7 +307,7 @@ public class BoardRenderer : MonoBehaviour
 
     // 스프라이트가 오른쪽(>)을 기본으로 생성됐으므로 회전으로 4방향 표현
     float angle = 0f;
-    if (delta == Vector2Int.up)        angle = 90f;
+    if (delta == Vector2Int.up) angle = 90f;
     else if (delta == Vector2Int.left) angle = 180f;
     else if (delta == Vector2Int.down) angle = 270f;
 
@@ -358,7 +401,7 @@ public class BoardRenderer : MonoBehaviour
 
     float h = size * 0.5f;
     float thick = size * 0.18f;                            // 선 두께(픽셀). 크게 하면 굵어짐
-    Vector2 tip     = new Vector2(size * 0.75f, h);        // 오른쪽 꼭짓점
+    Vector2 tip = new Vector2(size * 0.75f, h);        // 오른쪽 꼭짓점
     Vector2 topLeft = new Vector2(size * 0.25f, size * 0.82f); // 위쪽 끝
     Vector2 botLeft = new Vector2(size * 0.25f, size * 0.18f); // 아래쪽 끝
 
@@ -507,10 +550,14 @@ public class BoardRenderer : MonoBehaviour
 
     if (stuckSound != null) audioSource.PlayOneShot(stuckSound);
     if (SettingsManager.Instance != null) SettingsManager.Instance.Vibrate();  // 막혀서 리셋될 때 진동
-    // 막힘을 알리기 위해 모든 칸을 빨간색으로 잠깐 표시
-    Color stuckColor = new Color(1f, 0.4f, 0.4f);
+    // 막힘을 알리기 위해 모든 칸을 stuckColor로 잠깐 표시
+    // filledSprite가 남아 있으면 이미지 색상과 stuckColor가 곱해져 색이 왜곡되므로
+    // 순수한 stuckColor를 보여주기 위해 잠시 흰색 기본 스프라이트로 되돌린다
     foreach (var kv in cells)
+    {
+      kv.Value.sprite = cellSprite;
       kv.Value.color = stuckColor;
+    }
 
     yield return waitStuck;
 
@@ -646,11 +693,28 @@ public class BoardRenderer : MonoBehaviour
       SpriteRenderer sr = kv.Value;
 
       if (won)
+      {
+        sr.sprite = cellSprite;                                       // 기본 둥근 사각형으로 복귀
         sr.color = winColor;                                          // 클리어 → 전부 라벤더
+      }
       else if (pathSet.Contains(c))
-        sr.color = (c == level.startCell) ? startColor : filledColor; // 경로 칸 → 시작은 노랑, 나머지는 파랑
+      {
+        if (scaledFilledSprite != null)
+        {
+          sr.sprite = scaledFilledSprite;                             // 시작 칸·경로 칸 모두 지정 이미지로 통일
+          sr.color = Color.white;                                     // tint 제거해 원본 색 그대로 표시
+        }
+        else
+        {
+          sr.sprite = cellSprite;
+          sr.color = (c == level.startCell) ? startColor : filledColor; // 이미지 미지정 시에만 시작 칸을 노랑으로 구분
+        }
+      }
       else
+      {
+        sr.sprite = cellSprite;
         sr.color = emptyColor;                                        // 아직 안 지난 칸 → 회색
+      }
     }
 
     // 경로 선 업데이트

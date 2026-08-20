@@ -8,12 +8,12 @@ public class GameManager : MonoBehaviour
 {
   public BoardRenderer board;        // 판을 그리는 친구. 인스펙터에서 Board 오브젝트 연결
   public LevelData[] levels;         // 레벨 목록 (asset index 0 = Level_1). 인스펙터에서 드래그로 추가
-  public TMP_Text levelText;         // 진행도 표시용 (예: "42 / 100")
-  public TMP_Text roundCountText;    // 진행도 표시용 (예: "42 / 100")
+  public TMP_Text levelText;         // 상단 레벨 표시. "LEVEL {번호}" 형태로 매 판 갱신
+  public TMP_Text roundCountText;    // (사용 안 함) 인스펙터 연결 보존
   public RewardManager rewardManager; // 모든 레벨 클리어 시 보상 처리. 인스펙터에서 연결
   public CompletionPanel completionPanel; // 완주 확정 화면. 앱 재시작 시 완주 상태면 자동 표시. 인스펙터에서 연결
   public AdManager adManager;         // 전면 광고 관리. 인스펙터에서 연결
-  public LivesSystem livesSystem;     // 목숨 시스템. 리셋 이벤트 -1, 클리어 이벤트 리필
+  public LivesSystem livesSystem;     // 목숨 시스템. 리셋 이벤트 -1. 클리어 시엔 손대지 않음(상태 이월)
 
 #if UNITY_EDITOR
   [Header("에디터 전용 (빌드에는 영향 없음)")]
@@ -91,8 +91,7 @@ public class GameManager : MonoBehaviour
   // 에디터 테스트 모드: 진행/저장 무시. 매번 이 레벨만 다시 로드.
   void ShowEditorTestLevel()
   {
-    if (levelText != null) levelText.text = "TEST";
-    if (roundCountText != null) roundCountText.text = "TEST";
+    if (levelText != null) levelText.text = "LEVEL TEST";
     board.ShowLevel(editorTestLevel);
   }
 #endif
@@ -248,11 +247,9 @@ public class GameManager : MonoBehaviour
   {
     currentIndex = index;
     // 지금 도전 중인 판은 (clearedCount + 1) 번째. 진행도 표시.
-    // asset 개수가 아니라 유저 노출 판 수(100) 기준 — 100판 완주 후 남은 그룹 D 여분 판을 풀 때는 "100 / 100" 유지
+    // asset 개수가 아니라 유저 노출 판 수(100) 기준 — 100판 완주 후 남은 그룹 D 여분 판을 풀 때는 "100"에서 캡
     int display = Mathf.Min(clearedCount + 1, TotalDisplayLevels);
-    string progress = display + " / " + TotalDisplayLevels;
-    if (levelText != null) levelText.text = progress;
-    if (roundCountText != null) roundCountText.text = progress;
+    if (levelText != null) levelText.text = $"LEVEL {display}";
 
     board.ShowLevel(levels[currentIndex]);
   }
@@ -276,9 +273,6 @@ public class GameManager : MonoBehaviour
       clearedCount++;
       SaveProgress();
     }
-
-    // 판 클리어 = 목숨이 3 미만이면 3으로 리필, 아니면 그대로 유지
-    if (livesSystem != null) livesSystem.OnLevelCleared();
 
     // 유저 관점 완주(100판) = 보상 트리거. asset 110개 중 나머지 10개는 완주 후 자유 플레이용
     // (그 판을 클리어해도 RewardManager가 기기ID로 중복 발급 차단하니 동일 코드만 재표시됨)

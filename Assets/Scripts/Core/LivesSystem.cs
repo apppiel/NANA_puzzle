@@ -8,7 +8,7 @@ using TMPro;
 // - 목숨 값 하나로 관리 (기본 3, 상한 99)
 // - 리셋 시 -1, 0 되면 잠금 오버레이
 // - 광고 시청 시 +3
-// - 판 클리어 시: 값과 무관하게 무조건 3으로 리셋 (광고로 쌓은 여분은 클리어 순간 초기화)
+// - 판 클리어 시: 상태(값·타이머 앵커) 그대로 유지. 다음 판으로 그대로 이월.
 // - 자동 복구: 3 미만이면 10분마다 1개씩 회복 (상한 3). 하트 옆 recoveryTimerText에 다음 회복까지 MM:SS 표시.
 public class LivesSystem : MonoBehaviour
 {
@@ -16,7 +16,8 @@ public class LivesSystem : MonoBehaviour
 
   [Header("HUD")]
   public AdManager adManager;          // 보상형 광고 호출
-  public TMP_Text livesText;           // 상단 "x3" 표시. 없어도 동작함
+  public TMP_Text livesText;           // (사용 안 함, 씬에 "x" 정적 라벨 유지용) 인스펙터 연결 보존
+  public TMP_Text livesNumber;         // 현재 남은 목숨 숫자만 표시 (예: "3"). livesText 옆에 놓는 숫자 텍스트
   public TMP_Text recoveryTimerText;   // 하트 옆 다음 회복까지 카운트다운(MM:SS). 3 미만일 때만 표시. 없어도 동작함
   public Button fillButton;            // "+ 목숨 채우기" 버튼. 없어도 동작함
   public LoadingScreen loadingScreen;  // 로딩 끝나기 전까지 잠금 팝업 표시를 지연. 미연결 시 즉시 표시
@@ -127,19 +128,6 @@ public class LivesSystem : MonoBehaviour
     if (current <= 0) ShowLockOverlay();
   }
 
-  // 판 클리어 → 현재 값과 무관하게 무조건 3으로 리셋. GameManager.OnLevelSolved에서 호출.
-  // 판 진행 중엔 광고로 99까지 스택 가능하지만, 클리어 순간 초과분은 버림.
-  public void OnLevelCleared()
-  {
-    current = BaseLives;
-    lastLostAt = 0;
-    SaveState();
-    UpdateHudText();
-    UpdateRecoveryTimerText();
-    RefreshRecoveryNotification();
-    HideLockOverlay();
-  }
-
   // GameManager.ResetAndRestart에서 호출. 최소 하트 3 보장(0 상태로 리셋되어 즉시 잠금 상태 방지).
   // 광고로 쌓인 여분(4+)은 그대로 보존.
   public void RefillOnReset()
@@ -194,7 +182,7 @@ public class LivesSystem : MonoBehaviour
 
   void UpdateHudText()
   {
-    if (livesText != null) livesText.text = "x" + current;
+    if (livesNumber != null) livesNumber.text = current.ToString();
   }
 
   // 잠금 팝업 활성 여부. BoardRenderer가 이걸 보고 잠금 중엔 raw Input 무시.
